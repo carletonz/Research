@@ -9,6 +9,8 @@ QFunction = np.zeros((16, 4))
 alpha = 0.05
 gama = 0.9
 
+
+# Training
 state = 0
 reward = 0
 done = False
@@ -60,4 +62,52 @@ print(goal_found)
 print("Left down right up")
 print(QFunction)
 
+
+# Testing
+goal_found2 = 0
+
+observation = 0
+reward = 0
+done = False
+info = {}
+
+env.reset()
+
+for i in range(1000):
+    while True:
+        env.render()
+
+        # stores current observation so it can be used to calculate update to Q function
+        oldObservation = state
+
+        # do some action
+        action = get_action(oldObservation)
+        state, reward, done, info = env.step(action)
+
+        # stop condition
+        if done:
+            if reward == 1:
+                goal_found2 += 1
+            QFunction[state, 0] = reward
+            QFunction[state, 1] = reward
+            QFunction[state, 2] = reward
+            QFunction[state, 3] = reward
+            env.reset()
+            break
+
+    # reset variables run game again
+    observation = 0
+    reward = 0
+    done = False
+    info = {}
+
+print(goal_found2)
+
 env.close()
+
+# Jointly optimized:
+# maze where certain walls can be removed when an agent is standing on a certain square
+# How woudl states be encoded? seem like a lot of states, actions would be
+
+# Separately optimized:
+#
