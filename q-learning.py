@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # environment
+# si_slippery=True --> 33% chance chosen action is taken, Default
+# si_slippery=False --> 100% chance chosen action is taken
 env = gym.make('FrozenLake-v0')#, is_slippery=False)
 env.reset()
 
@@ -11,6 +13,7 @@ QFunction = np.zeros((env.nS, env.nA))
 alpha = 0.01
 gamma = 0.9
 epsilon = 0.2
+episodes = 50000
 
 state = env.s
 reward = 0
@@ -42,7 +45,6 @@ def simulate(training = True):
         state, reward, done, info = env.step(action)
         if training:
             # Update Q value
-            # i think there is something wrong with my update function
             QFunction[old_state, action] = (1 - alpha)*QFunction[old_state, action] + alpha * (reward + gamma * QFunction[state, get_action(state, best=True)])
 
         # stop condition
@@ -62,7 +64,7 @@ def simulate(training = True):
 
 
 # Training
-for i in range(10000):
+for i in range(episodes):
     simulate()
     if i % 100 == 0:
         # test
@@ -74,6 +76,8 @@ for i in range(10000):
 accuracy = np.matrix(accuracy)
 plt.plot(accuracy[:, 0], accuracy[:, 1])
 plt.show()
+
+print(QFunction)
 
 env.close()
 
