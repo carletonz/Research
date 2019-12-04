@@ -18,7 +18,7 @@ agent2_QFunction = np.zeros((env.nS, 2, int(env.nA/2))) # positive or negative [
 alpha = 0.01
 gamma = 0.9
 epsilon = 0.2
-episodes = 13000
+episodes = 20000
 
 state = env.s
 reward = 0
@@ -94,9 +94,9 @@ for i in range(episodes):
     if i % 100 == 0:
         # test
         goal_found = 0
-        a1_sum_q = 0
-        a2_sum_q = 0
         for j in range(100):
+            a1_sum_q = 0
+            a2_sum_q = 0
             simulate(training=False)
         q_values.append([a1_sum_q, a2_sum_q])
         accuracy.append([i/100, goal_found/100])
