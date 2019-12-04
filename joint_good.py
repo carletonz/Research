@@ -3,17 +3,21 @@ import gym.envs.toy_text.frozen_lake as fl
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Show that a joint optimization can be efficiently trained
+# Use frozen lake where one action is to go horizontally or vertically
+# Other action is to go in the positive (up, right) or negative (down, left) direction
+
 # environment
 # si_slippery=True --> 33% chance chosen action is taken, Default
 # si_slippery=False --> 100% chance chosen action is taken
-env = gym.make('FrozenLake-v0')#, is_slippery=False)
+env = gym.make('FrozenLake-v0', is_slippery=False)
 env.reset()
 
-QFunction = np.zeros((env.nS, env.nA))
+QFunction = np.zeros((env.nS, int(env.nA/2), 2))
 alpha = 0.01
 gamma = 0.9
 epsilon = 0.2
-episodes = 50000
+episodes = 7000
 
 state = env.s
 reward = 0
@@ -45,12 +49,18 @@ def simulate(training = True):
         # do some action, if we are testing always use q-function to get best move
         action = get_action(old_state, best=not training)
         state, reward, done, info = env.step(action)
+        row = int(action / 2)
+        col = action % 2
 
-        sum_q += QFunction[old_state, action]
+        sum_q += QFunction[old_state, row, col]
 
         if training:
             # Update Q value
-            QFunction[old_state, action] = (1 - alpha)*QFunction[old_state, action] + alpha * (reward + gamma * QFunction[state, get_action(state, best=True)])
+            best_action = get_action(state, best=True)
+            b_row = int(best_action/2)
+            b_col = best_action%2
+
+            QFunction[old_state, row, col] = (1 - alpha)*QFunction[old_state, row, col] + alpha * (reward + gamma * QFunction[state, b_row, b_col])
 
         # stop condition
         if done:
@@ -80,7 +90,6 @@ for i in range(episodes):
         q_values.append(sum_q)
         accuracy.append([i/100, goal_found/100])
 
-
 accuracy = np.matrix(accuracy)
 plt.plot(accuracy[:, 0], accuracy[:, 1])
 plt.xlabel('x100 Updates')
@@ -92,6 +101,8 @@ plt.plot(np.arange(q_values.shape[0]), q_values)
 plt.xlabel('x100 updates')
 plt.ylabel('Total Reward')
 plt.show()
+
+print(QFunction)
 
 env.close()
 
