@@ -14,11 +14,11 @@ env = gym.make('FrozenLake-v0', is_slippery=False)
 env.reset()
 
 agent1_QFunction = np.zeros((env.nS, int(env.nA/2))) # horizontal or vertical
-agent2_QFunction = np.zeros((env.nS, 2, int(env.nA/2))) # positive or negative [state][horizontal or vertical]
-alpha = 0.01
+agent2_QFunction = np.zeros((env.nS, int(env.nA/2))) # positive or negative
+alpha = 0.007
 gamma = 0.9
-epsilon = 0.2
-episodes = 20000
+epsilon = 0.02
+episodes = 30000
 
 state = env.s
 reward = 0
@@ -42,12 +42,11 @@ def get_action_1(s, best = False):
 
 # Gets the next action to take given the current state
 # Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
-def get_action_2(s, a1, best = False):
+def get_action_2(s, best = False):
     r = np.random.random()
     if best or r < epsilon:
-        return np.argmax(agent2_QFunction[s][a1])
-    a = np.random.randint(0, env.nA / 2)
-    return a
+        return np.argmax(agent2_QFunction[s])
+    return np.random.randint(0, env.nA / 2)
 
 
 def simulate(training = True):
@@ -60,24 +59,22 @@ def simulate(training = True):
 
         # do some action, if we are testing always use q-function to get best move
         action_1 = get_action_1(old_state, best=not training)
-        action_2 = get_action_2(old_state, action_1, best=not training)
+        action_2 = get_action_2(old_state, best=not training)
         state, reward, done, info = env.step(2*action_2+action_1)
 
         a1_sum_q += agent1_QFunction[old_state, action_1]
-        a2_sum_q += agent2_QFunction[old_state, action_1, action_2]
+        a2_sum_q += agent2_QFunction[old_state, action_2]
 
         if training:
             # Update Q values
             agent1_QFunction[old_state, action_1] = (1 - alpha) * agent1_QFunction[old_state, action_1] + alpha * (reward + gamma * agent1_QFunction[state, get_action_1(state, best=True)])
-            agent2_QFunction[old_state, action_1, action_2] = (1 - alpha) * agent2_QFunction[old_state, action_1, action_2] + alpha * (reward + gamma * agent2_QFunction[state, get_action_1(state, best=True), get_action_2(state, action_1, best=True)])
+            agent2_QFunction[old_state, action_2] = (1 - alpha) * agent2_QFunction[old_state, action_2] + alpha * (reward + gamma * agent2_QFunction[state, get_action_2(state, best=True)])
 
         # stop condition
         if done:
             if reward == 1:
                 goal_found += 1
             break
-
-
 
     # reset variables run game again
     env.reset()

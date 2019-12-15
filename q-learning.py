@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 # environment
 # si_slippery=True --> 33% chance chosen action is taken, Default
 # si_slippery=False --> 100% chance chosen action is taken
-env = gym.make('FrozenLake-v0')#, is_slippery=False)
+env = gym.make('FrozenLake-v0', is_slippery=False)
 env.reset()
 
 QFunction = np.zeros((env.nS, env.nA))
 alpha = 0.01
 gamma = 0.9
 epsilon = 0.2
-episodes = 50000
+episodes = 5000
 
 state = env.s
 reward = 0
@@ -21,9 +21,11 @@ done = False
 info = {}
 
 goal_found = 0
-sum_q = 0
+
+R = 0
+g_t = 1
 accuracy = []
-q_values = []
+R_values = []
 
 
 # Gets the next action to take given the current state
@@ -35,7 +37,7 @@ def get_action(s, best = False):
 
 
 def simulate(training = True):
-    global state, reward, done, info, goal_found, sum_q
+    global state, reward, done, info, goal_found, R, g_t
     while True:
         env.render()
 
@@ -46,7 +48,8 @@ def simulate(training = True):
         action = get_action(old_state, best=not training)
         state, reward, done, info = env.step(action)
 
-        sum_q += QFunction[old_state, action]
+        g_t *= gamma
+        R += g_t * reward
 
         if training:
             # Update Q value
@@ -74,11 +77,14 @@ for i in range(episodes):
     if i % 100 == 0:
         # test
         goal_found = 0
+        ave_R = 0
         for j in range(100):
-            sum_q = 0
+            R = 0
+            g_t = 1
             simulate(training=False)
-        q_values.append(sum_q)
+            ave_R+=R
         accuracy.append([i/100, goal_found/100])
+        R_values.append(ave_R/100)
 
 
 accuracy = np.matrix(accuracy)
@@ -87,11 +93,14 @@ plt.xlabel('x100 Updates')
 plt.ylabel('Accuracy')
 plt.show()
 
-q_values = np.array(q_values)
-plt.plot(np.arange(q_values.shape[0]), q_values)
+R_values = np.array(R_values)
+plt.plot(np.arange(R_values.shape[0]), R_values)
+plt.plot(np.arange(R_values.shape[0]), np.ones(R_values.shape[0])*gamma**6)
 plt.xlabel('x100 updates')
-plt.ylabel('Total Reward')
+plt.ylabel('R')
 plt.show()
+
+print(QFunction)
 
 env.close()
 
