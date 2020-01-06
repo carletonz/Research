@@ -1,16 +1,16 @@
 
 # Q-learning  
 ### Non-Stochastic Environment
-When using the frozen lake environment where is_slippery=False (Non-stochastic) the accuracy of the agent plateaus around 200 to 300 episodes. The sharp increase in accuracy is normal because while testing there is no randomness in this case. This means that the path it takes on the first try while testing is the same path it will take on all other tries.
+When using the frozen lake environment where is_slippery=False (Non-stochastic) the accuracy of the agent plateaus around 200 episodes. The sharp increase in accuracy is normal because while testing there is no randomness in this case. This means that the path it takes on the first try while testing is the same path it will take on all other tries.
 
 ![](https://github.com/carletonz/Research/raw/master/graphs/Accuracy-Non-Stochastic.png)
 
-For this environment the total reward seems to start to convert to about 5 after 7000 episodes.
+For this environment the discounted return (the blue line) converges to 0.59049 after 200 episodes. We calculated the expected discounted return using value iteration, which is also 0.59049.
  
 ![](https://github.com/carletonz/Research/raw/master/graphs/R-Non-Stochastic.png)
 
 ### Stochastic Environment
-When using a stochastic environment the accuracy of the agent seems to start to plateau around 10000 episodes.
+When using a stochastic environment the accuracy and discounted return of the agent seems to start to converge around 15000 episodes. The accuracy converges to about 75% and the discounted return converges to about 0.0688909.
 
 ![](https://github.com/carletonz/Research/raw/master/graphs/Accracy-Stochastic.png)
 ![](https://github.com/carletonz/Research/raw/master/graphs/R-Stochastic.png)
