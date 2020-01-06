@@ -17,7 +17,7 @@ QFunction = np.zeros((env.nS, int(env.nA/2), 2))
 alpha = 0.01
 gamma = 0.9
 epsilon = 0.2
-episodes = 7000
+episodes = 50000
 
 state = env.s
 reward = 0
@@ -25,9 +25,10 @@ done = False
 info = {}
 
 goal_found = 0
-sum_q = 0
+R = 0
+g_t = 1
 accuracy = []
-q_values = []
+R_values = []
 
 
 # Gets the next action to take given the current state
@@ -39,7 +40,7 @@ def get_action(s, best = False):
 
 
 def simulate(training = True):
-    global state, reward, done, info, goal_found, sum_q
+    global state, reward, done, info, goal_found, R, g_t
     while True:
         env.render()
 
@@ -52,7 +53,8 @@ def simulate(training = True):
         row = int(action / 2)
         col = action % 2
 
-        sum_q += QFunction[old_state, row, col]
+        g_t *= gamma
+        R += g_t * reward
 
         if training:
             # Update Q value
@@ -84,10 +86,14 @@ for i in range(episodes):
     if i % 100 == 0:
         # test
         goal_found = 0
+        ave_R = 0
         for j in range(100):
+            R = 0
+            g_t = 1
             sum_q = 0
             simulate(training=False)
-        q_values.append(sum_q)
+            ave_R += R
+        R_values.append(ave_R / 100)
         accuracy.append([i/100, goal_found/100])
 
 accuracy = np.matrix(accuracy)
@@ -96,10 +102,10 @@ plt.xlabel('x100 Updates')
 plt.ylabel('Accuracy')
 plt.show()
 
-q_values = np.array(q_values)
-plt.plot(np.arange(q_values.shape[0]), q_values)
+R_values = np.array(R_values)
+plt.plot(np.arange(R_values.shape[0]), R_values)
 plt.xlabel('x100 updates')
-plt.ylabel('Total Reward')
+plt.ylabel('R')
 plt.show()
 
 print(QFunction)

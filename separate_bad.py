@@ -1,127 +1,104 @@
 import gym
-import gym.envs.toy_text.frozen_lake as fl
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Show that a joint optimization can be efficiently trained
-# Use frozen lake where one action is to go horizontally or vertically
-# Other action is to go in the positive (up, right) or negative (down, left) direction
 
-# environment
-# si_slippery=True --> 33% chance chosen action is taken, Default
-# si_slippery=False --> 100% chance chosen action is taken
-env = gym.make('FrozenLake-v0', is_slippery=False)
-env.reset()
+class QLearning:
+    def __init__(self, environment):
+        self.actionCount = int(environment.nA/2)
+        self.QFunction = np.zeros((environment.nS, self.actionCount))
+        self.alpha = 0.007
+        self.gamma = 0.9
+        self.epsilon = 0.2
 
-agent1_QFunction = np.zeros((env.nS, int(env.nA/2))) # horizontal or vertical
-agent2_QFunction = np.zeros((env.nS, int(env.nA/2))) # positive or negative
-alpha = 0.007
-gamma = 0.9
-epsilon = 0.02
-episodes = 30000
+    # Gets the next action to take given the current state
+    # Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
+    def get_action(self, s, best = False):
+        if best or np.random.random() > self.epsilon:
+            return np.argmax(self.QFunction[s])
+        return np.random.randint(0, self.actionCount)
 
-state = env.s
-reward = 0
-done = False
-info = {}
-
-goal_found = 0
-a1_sum_q = 0
-a2_sum_q = 0
-accuracy = []
-q_values = []
+    # Update Q function
+    def update(self, state, action, state_prime, reward):
+        self.QFunction[state, action] = (1 - self.alpha) * self.QFunction[state, action] + self.alpha * (
+                    reward + self.gamma * self.QFunction[state_prime, self.get_action(state_prime, best=True)])
 
 
-# Gets the next action to take given the current state
-# Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
-def get_action_1(s, best = False):
-    if best or np.random.random() < epsilon:
-        return np.argmax(agent1_QFunction[s])
-    return np.random.randint(0, env.nA/2)
+class Simulation:
+    def __init__(self, agent = QLearning):
+        # environment
+        # is_slippery=True --> 33% chance chosen action is taken, Default
+        # is_slippery=False --> 100% chance chosen action is taken
+        self.env = gym.make('FrozenLake-v0', is_slippery=True)
+        self.agent1 = agent(self.env)  # horizontal or vertical action
+        self.agent2 = agent(self.env)  # positive or negative direction
+
+        self.R = 0
+        self.t = 0
+
+        self.state = self.env.s
+        self.reward = 0
+        self.done = False
+
+        self.env.reset()
+
+    def reset(self):
+        self.env.reset()
+        self.R = 0
+        self.t = 0
+
+        self.state = self.env.s
+        self.reward = 0
+        self.done = False
+
+    def simulate(self, train=False):
+        while not self.done:
+            action1 = self.agent1.get_action(self.state, best=not train)  # horizontal (0) or vertical (1) action
+            action2 = self.agent2.get_action(self.state, best=not train)  # negative (0) or positive (1) direction
+            state_prime, self.reward, self.done, info = self.env.step(action1 + 2*action2)
+
+            self.R = self.R + (self.agent1.gamma**self.t)*self.reward
+
+            if train:
+                self.agent1.update(self.state, action1, state_prime, self.reward)
+                self.agent2.update(self.state, action2, state_prime, self.reward)
+            self.state = state_prime
+            self.t += 1
+
+        return self.reward, self.R
 
 
-# Gets the next action to take given the current state
-# Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
-def get_action_2(s, best = False):
-    r = np.random.random()
-    if best or r < epsilon:
-        return np.argmax(agent2_QFunction[s])
-    return np.random.randint(0, env.nA / 2)
+if __name__ == "__main__":
+    episodes = 50000
+    number_of_rollouts = 1000
+    accuracy_values = []
+    R_values = []
+    sim = Simulation()
+    for i in range(episodes):
+        sim.simulate(train=True)
+        sim.reset()
+        if i % 100 == 0:
+            accuracy = 0
+            R_ave = 0
+            for j in range(number_of_rollouts):
+                success, R = sim.simulate(train=False)
+                sim.reset()
+                accuracy += success
+                R_ave += R
+            accuracy_values.append(accuracy/number_of_rollouts)
+            R_values.append(R_ave/number_of_rollouts)
+            print("Episode: ", i, " Accuracy: ", accuracy/number_of_rollouts, " R: ", R_ave/number_of_rollouts)
 
+    plt.plot(np.arange(len(accuracy_values)), accuracy_values)
+    plt.xlabel('x100 Episodes')
+    plt.ylabel('Accuracy')
+    plt.show()
 
-def simulate(training = True):
-    global state, reward, done, info, goal_found, a1_sum_q, a2_sum_q
-    while True:
-        env.render()
-
-        # stores current state so it can be used to calculate update to Q function
-        old_state = state
-
-        # do some action, if we are testing always use q-function to get best move
-        action_1 = get_action_1(old_state, best=not training)
-        action_2 = get_action_2(old_state, best=not training)
-        state, reward, done, info = env.step(2*action_2+action_1)
-
-        a1_sum_q += agent1_QFunction[old_state, action_1]
-        a2_sum_q += agent2_QFunction[old_state, action_2]
-
-        if training:
-            # Update Q values
-            agent1_QFunction[old_state, action_1] = (1 - alpha) * agent1_QFunction[old_state, action_1] + alpha * (reward + gamma * agent1_QFunction[state, get_action_1(state, best=True)])
-            agent2_QFunction[old_state, action_2] = (1 - alpha) * agent2_QFunction[old_state, action_2] + alpha * (reward + gamma * agent2_QFunction[state, get_action_2(state, best=True)])
-
-        # stop condition
-        if done:
-            if reward == 1:
-                goal_found += 1
-            break
-
-    # reset variables run game again
-    env.reset()
-    state = env.s
-    reward = 0
-    done = False
-    info = {}
-
-
-# Training
-continueTraining = True
-for i in range(episodes):
-    simulate()
-    if i % 100 == 0:
-        # test
-        goal_found = 0
-        for j in range(100):
-            a1_sum_q = 0
-            a2_sum_q = 0
-            simulate(training=False)
-        q_values.append([a1_sum_q, a2_sum_q])
-        accuracy.append([i/100, goal_found/100])
-        if accuracy[-1][1] > .7:
-            continueTraining = False
-
-accuracy = np.matrix(accuracy)
-plt.plot(accuracy[:, 0], accuracy[:, 1])
-plt.xlabel('x100 Updates')
-plt.ylabel('Accuracy')
-plt.show()
-
-q_values = np.matrix(q_values)
-plt.plot(np.arange(q_values.shape[0]), q_values[:, 0])
-plt.xlabel('x100 updates')
-plt.ylabel('Total Reward 1')
-plt.show()
-
-plt.plot(np.arange(q_values.shape[0]), q_values[:, 1])
-plt.xlabel('x100 updates')
-plt.ylabel('Total Reward 2')
-plt.show()
-
-print(q_values)
-
-env.close()
-
-# Separately optimized
-# frozen lake where one action determines horizontal or vertical movement and the other action determines positive or
-# negative direction
-
+    # Expected discounted return
+    # stochastic: 0.0688909
+    # non-stochastic: 0.59049
+    plt.plot(np.arange(len(R_values)), R_values)
+    plt.plot(np.arange(len(R_values)), np.ones(len(R_values))*0.0688909)
+    plt.xlabel('x100 Episodes')
+    plt.ylabel('Discounted Return')
+    plt.show()
