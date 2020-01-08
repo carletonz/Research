@@ -48,10 +48,14 @@ One reason why the separate agents do worse than the joint agent is because the 
 ### Frozen Lake: stochastic environment
 ### Mountain Car: actions are discrete
 
-(Coming soon)
+For this agent I used a gamma of 1 rather than a gamma of 0.9. This is why for the frozen lake environment accuracy and discounted return are the same
+
+![](https://github.com/carletonz/Research/raw/master/graphs/joint_bad_FL_R.png)
+![](https://github.com/carletonz/Research/raw/master/graphs/joint_bad_FL_accuraccy.png)
+![](https://github.com/carletonz/Research/raw/master/graphs/joint_bad_mc_R.png)
 
 # Separate: Good (Frozen Lake / Mountain Car)
 ### Frozen Lake: stochastic environment
 ### Mountain Car: actions are discrete
 
-(Coming soon)
+![](https://github.com/carletonz/Research/blob/master/graphs/separate_good_mc_R.png)
