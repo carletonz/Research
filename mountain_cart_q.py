@@ -20,7 +20,7 @@ class QLearning:
         self.actionCount = environment.action_space.n
 
         self.QFunction = np.zeros((self.stateCount, self.actionCount))
-        self.alpha = 0.01
+        self.alpha = 0.05 # 0.01
         self.gamma = 1
         self.epsilon = 0.1
 
@@ -48,31 +48,31 @@ class Simulation:
     def __init__(self, agent = QLearning):
         self.env = gym.make('MountainCar-v0')
         self.agent = agent(self.env)
-        self.env.reset()
 
         self.R = 0
         self.t = 0
 
-        self.state = self.env.state
+        self.state = self.env.reset()
         self.reward = 0
         self.done = False
 
     def reset(self):
-        self.env.reset()
+
 
         self.R = 0
         self.t = 0
 
-        self.state = self.env.state
+        self.state = self.env.reset()
         self.reward = 0
         self.done = False
 
     def simulate(self, train=False):
         while not self.done:
-            self.env.render()
+            if not train:
+                self.env.render()
+
             action = self.agent.get_action(self.state, best=not train)
             state_prime, self.reward, self.done, info = self.env.step(action)
-            print(action, state_prime)
             self.R = self.R + (self.agent.gamma**self.t)*self.reward
 
             if train:
@@ -84,8 +84,8 @@ class Simulation:
 
 
 if __name__ == "__main__":
-    episodes = 5000
-    number_of_rollouts = 100
+    episodes = 50000
+    number_of_rollouts = 20
     accuracy_values = []
     R_values = []
     sim = Simulation()
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         print("--------------------------------------------------Episode", i)
         sim.simulate(train=True)
         sim.reset()
-        if i % 1000 == 0:
+        if (i+1) % 1000 == 0:
             accuracy = 0
             R_ave = 0
             for j in range(number_of_rollouts):
@@ -115,6 +115,6 @@ if __name__ == "__main__":
     # non-stochastic: 0.59049
     plt.plot(np.arange(len(R_values)), R_values)
     #plt.plot(np.arange(len(R_values)), np.ones(len(R_values))*0.0688909)
-    plt.xlabel('x100 Episodes')
+    plt.xlabel('x1000 Episodes')
     plt.ylabel('Discounted Return')
     plt.show()
