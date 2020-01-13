@@ -107,7 +107,7 @@ class Simulation:
     def simulate(self, train=False):
         while not self.done1 or not self.done2:
             if not train:
-                self.env.render()
+                self.env1.render()
 
             if not self.done1:
                 action1 = self.agent1.get_action(self.state1, best=not train)
