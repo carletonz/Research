@@ -27,7 +27,7 @@ class QLearning:
 class Simulation:
     def __init__(self, agent = QLearning):
         # environment
-        # is_slippery=True --> 33% chance chosen action is taken, Default
+        # is_slippery=True --> 33% any action except the opposite of the chosen action is done
         # is_slippery=False --> 100% chance chosen action is taken
         self.env = gym.make('FrozenLake-v0', is_slippery=True)
         self.agent = agent(self.env)

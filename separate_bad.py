@@ -7,7 +7,7 @@ class QLearning:
     def __init__(self, environment):
         self.actionCount = int(environment.nA/2)
         self.QFunction = np.zeros((environment.nS, self.actionCount))
-        self.alpha = 0.007
+        self.alpha = 0.01
         self.gamma = 0.9
         self.epsilon = 0.2
 
@@ -93,6 +93,8 @@ if __name__ == "__main__":
     plt.xlabel('x100 Episodes')
     plt.ylabel('Accuracy')
     plt.show()
+    
+    np.save("data/accuracy_sB.npy", accuracy_values)
 
     # Expected discounted return
     # stochastic: 0.0688909
@@ -102,3 +104,5 @@ if __name__ == "__main__":
     plt.xlabel('x100 Episodes')
     plt.ylabel('Discounted Return')
     plt.show()
+    
+    np.save("data/R_sB.npy", R_values)

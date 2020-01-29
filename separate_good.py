@@ -3,14 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class QLearningFL:
-    def __init__(self, environment):
+class QLearning:
+    def __init__(self, alpha, gamma, epsilon):
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+    
+    def setEnv(self, environment):
         self.actionCount = environment.nA
         self.QFunction = np.zeros((environment.nS, self.actionCount))
-        self.alpha = 0.007
-        self.gamma = 0.9
-        self.epsilon = 0.2
-
+    
     # Gets the next action to take given the current state
     # Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
     def get_action(self, s, best = False):
@@ -22,154 +24,116 @@ class QLearningFL:
     def update(self, state, action, state_prime, reward):
         self.QFunction[state, action] = (1 - self.alpha) * self.QFunction[state, action] + self.alpha * (
                     reward + self.gamma * self.QFunction[state_prime, self.get_action(state_prime, best=True)])
-
-class QLearningMC:
-    def __init__(self, environment):
-
-        # position: -1.2 to 0.6
-        # speed: -0.07 to 0.07
-
-        # make continuous states as discrete by dividing by 0.1 and 0.01
-        # this makes 19 discrete states for position and 15 discrete states for speed
-        # with a total of 285 states
-
-        self.individualCounts = ((environment.high - environment.low) / np.array([0.1, 0.01])).astype(int)
-        self.individualCounts[0] += 2
-        self.individualCounts[1] += 1
-        self.stateCount = (self.individualCounts[0]) * (self.individualCounts[1])
-        self.actionCount = environment.action_space.n
-
-        self.QFunction = np.zeros((self.stateCount, self.actionCount))
-        self.alpha = 0.05 # 0.01
-        self.gamma = 1
-        self.epsilon = 0.1
-
-    def hash_state(self, state):
-        state = ((np.array(state) + np.array([1.2, 0.07]))/np.array([0.1, 0.01])).astype(int)
-        return state[1] * self.individualCounts[0] + state[0]
-
-    # Gets the next action to take given the current state
-    # Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
-    def get_action(self, s, best = False):
-        s = self.hash_state(s)
-        if best or np.random.random() > self.epsilon:
-            return np.argmax(self.QFunction[s])
-        return np.random.randint(0, self.actionCount)
-
-    # Update Q function
-    def update(self, state, action, state_prime, reward):
-        h_state = self.hash_state(state)
-        h_state_prime = self.hash_state(state_prime)
-        self.QFunction[h_state, action] = (1 - self.alpha) * self.QFunction[h_state, action] + self.alpha * (
-                    reward + self.gamma * self.QFunction[h_state_prime, self.get_action(state_prime, best=True)])
-
-
-class Simulation:
-    def __init__(self, agent1 = QLearningMC, agent2 = QLearningFL):
-        self.env1 = gym.make('MountainCar-v0')
-        self.env2 = gym.make('FrozenLake-v0', is_slippery=True)
-        self.agent1 = agent1(self.env1)
-        self.agent2 = agent2(self.env2)
-
-        self.R1 = 0
-        self.t1 = 0
-
-        self.state1 = self.env1.reset()
-        self.reward1 = 0
-        self.done1 = False
-
-        self.R2 = 0
-        self.t2 = 0
-
-        self.env2.reset()
-
-        self.state2 = self.env2.s
-        self.reward2 = 0
-        self.done2 = False
+        
+class EpisodeSimulation:
+    def __init__(self, env, agent):
+        self.env1 = env
+        self.agent1 = agent
+        self.agent1.setEnv(self.env1)
+        
+        self.reset()
+        self.starting_state = self.state1
 
     def reset(self):
         self.R1 = 0
         self.t1 = 0
-
+        
         self.state1 = self.env1.reset()
+        self.state_prime1 = None
         self.reward1 = 0
         self.done1 = False
+        
+        self.action1 = None
+    
+    def take_action(self, train=True, done = False):
+        if done:
+            return self.reward1, self.done1
+        #if not train:
+        #    self.env1.render()
 
-        self.R2 = 0
-        self.t2 = 0
+        self.action1 = self.agent1.get_action(self.state1, best=not train)
+        self.state_prime1, self.reward1, self.done1, info1 = self.env1.step(self.action1)
+        self.R1 = self.R1 + (self.agent1.gamma ** self.t1) * self.reward1
+        
+        return self.reward1, self.done1
+    
+    def learn(self, reward, train = True, done = False):
+        if done:
+            return
+        
+        if train:
+            self.agent1.update(self.state1, self.action1, self.state_prime1, self.reward1)
+        self.state1 = self.state_prime1
+        self.t1 += 1
+    
+    def get_stats(self):
+        return self.reward1, self.R1
 
-        self.env2.reset()
-
-        self.state2 = self.env2.s
-        self.reward2 = 0
-        self.done2 = False
-
-    def simulate(self, train=False):
-        while not self.done1 or not self.done2:
-            if not train:
-                self.env1.render()
-
-            if not self.done1:
-                action1 = self.agent1.get_action(self.state1, best=not train)
-                self.state_prime1, self.reward1, self.done1, info1 = self.env1.step(action1)
-                self.R1 = self.R1 + (self.agent1.gamma ** self.t1) * self.reward1
-
-            if not self.done2:
-                action2 = self.agent2.get_action(self.state2, best=not train)
-                self.state_prime2, self.reward2, self.done2, info2 = self.env2.step(action2)
-                self.R2 = self.R2 + (self.agent2.gamma ** self.t2) * self.reward2
-
-            if train:
-                if not self.done1:
-                    self.agent1.update(self.state1, action1, self.state_prime1, self.reward1+self.reward2)
-                if not self.done2:
-                    self.agent2.update(self.state2, action2, self.state_prime2, self.reward1+self.reward2)
-            self.state1 = self.state_prime1
-            self.t1 += 1
-
-            self.state2 = self.state_prime2
-            self.t2 += 1
-
-        return self.reward1, self.reward2, self.R1, self.R2, self.R1 + self.R2
-
+def run_episode(sim, train=True):
+    done = [False for i in range(len(sim))]
+    reward = [0 for i in range(len(sim))]
+    while not all(done):
+        done_temp = [done[i] for i in range(len(sim))]
+        for i in range(len(sim)):
+            r, d = sim[i].take_action(train, done[i])
+            done_temp[i] = d
+            reward[i] = r
+        for i in range(len(sim)):
+            sim[i].learn(sum(reward), train, done[i])
+        done = done_temp
+    temp = np.array([sim[i].get_stats() for i in range(len(sim))]).flatten()
+    for s in sim:
+        s.reset()
+    return temp
 
 if __name__ == "__main__":
-    episodes = 50000
-    number_of_rollouts = 20
-    accuracy_values = []
-    R_values1 = []
-    R_values2 = []
-    sim = Simulation()
+    episodes = 100000
+    number_of_rollouts = 100
+    test_after = 1000 #episodes
+    acc_r_ave = np.zeros((int(episodes/test_after), 4))
+    
+    sim = [EpisodeSimulation(gym.make("FrozenLake-v0"), QLearning(0.01, 0.9, 0.07)),
+           EpisodeSimulation(gym.make("Taxi-v3"), QLearning(0.01, 0.9, 0.02))]
+    
     for i in range(episodes):
         print("--------------------------------------------------Episode", i)
-        sim.simulate(train=True)
-        sim.reset()
-        if (i+1) % 1000 == 0:
-            accuracy = 0
-            R_ave1 = 0
-            R_ave2 = 0
+        run_episode(sim)
+        if (i+1) % test_after == 0:
+            acc_r = np.zeros((4,))
             for j in range(number_of_rollouts):
-                success1,  success2, R1, R2, Rtotal = sim.simulate(train=False)
-                sim.reset()
-                accuracy += success2
-                R_ave1 += R1
-                R_ave2 += R2
-            accuracy_values.append(accuracy/number_of_rollouts)
-            R_values1.append(R_ave1 / number_of_rollouts)
-            R_values2.append(R_ave2 / number_of_rollouts)
-            print("Episode: ", i, " Accuracy: ", accuracy/number_of_rollouts, " R: ", R_ave1/number_of_rollouts)
-
-    plt.plot(np.arange(len(accuracy_values)), accuracy_values)
-    plt.xlabel('x100 Episodes')
+                acc_r += run_episode(sim, train=False)
+            acc_r /= number_of_rollouts
+            acc_r_ave[int((i+1) / test_after)-1] = acc_r
+            print("Episode: ", i, " Accuracy: ", acc_r[0], " R: ", acc_r[1])
+    
+    plt.plot(np.arange(len(acc_r_ave[:,0].flatten())), acc_r_ave[:,0].flatten())
+    plt.xlabel('x1000 Episodes')
     plt.ylabel('Accuracy')
-    plt.show()
-
-    plt.plot(np.arange(len(R_values1)), R_values1)
+    plt.savefig("Research/plots2/FL_SG_Accuracy__rewards_summed" + str(np.random.randint(10000)) + ".png")
+    plt.clf()
+    
+    
+    plt.plot(np.arange(len(acc_r_ave[:,1].flatten())), acc_r_ave[:,1].flatten())
+    plt.plot(np.arange(len(acc_r_ave[:,1].flatten())), np.ones(len(acc_r_ave[:,1].flatten()))*0.0688909)
     plt.xlabel('x1000 Episodes')
     plt.ylabel('Discounted Return')
-    plt.savefig("Research/plots/MC_SG_R_" + str(np.random.randint(10000)) + ".png")
+    plt.savefig("Research/plots2/FL_SG_R__rewards_summed" + str(np.random.randint(10000)) + ".png")
+    plt.clf()
+    
+    plt.plot(np.arange(len(acc_r_ave[:,2].flatten())), acc_r_ave[:,2].flatten())
+    plt.xlabel('x1000 Episodes')
+    plt.ylabel('Accuracy')
+    plt.clf()
 
-    plt.plot(np.arange(len(R_values2)), R_values2)
+    taxi_vi = np.load("Research/Taxi_value_itteration.npy")
+    print(sim[1].starting_state)
+    print(taxi_vi[sim[1].starting_state])
+    
+    plt.plot(np.arange(len(acc_r_ave[:,3].flatten())), acc_r_ave[:,3].flatten())
+    plt.plot(np.arange(len(acc_r_ave[:,3].flatten())), np.ones(len(acc_r_ave[:,3].flatten()))*taxi_vi[sim[1].starting_state])
     plt.xlabel('x1000 Episodes')
     plt.ylabel('Discounted Return')
-    plt.savefig("Research/plots/FL_SG_R_" + str(np.random.randint(10000)) + ".png")
+    plt.savefig("Research/plots2/Taxi_SG_R__rewards_summed" + str(np.random.randint(10000)) + ".png")
+    plt.clf()
+    
+    np.save("Research/data5/separate_good_rewards_summed.npy", acc_r_ave)
