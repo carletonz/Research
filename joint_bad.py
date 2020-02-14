@@ -1,6 +1,7 @@
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 
 
 class QLearning:
@@ -11,7 +12,10 @@ class QLearning:
         self.alpha = 0.01
         self.gamma = 0.9
         self.epsilon = 0.01
-
+    
+    def reset(self):
+        self.QFunction = np.zeros(self.QFunction.shape)
+    
     # Gets the next action to take given the current state
     # Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
     def get_action(self, s1, s2, best = False):
@@ -35,6 +39,10 @@ class Simulation:
 
         self.reset()
 
+    def resetEverything(self):
+        self.agent.reset()
+        self.reset()
+    
     def reset(self):
         self.R1 = 0
         self.t1 = 0
@@ -62,6 +70,7 @@ class Simulation:
                 self.R1 = self.R1 + (self.agent.gamma ** self.t1) * self.reward1 #change gamma to 0.9 to correct scaling?
             if not self.done2:
                 self.state_prime2, self.reward2, self.done2, _ = self.env2.step(action[1])
+                self.reward2 = (self.reward2 *128)
                 self.R2 = self.R2 + (self.agent.gamma ** self.t2) * self.reward2
 
             if train:
@@ -74,56 +83,66 @@ class Simulation:
 
 
 if __name__ == "__main__":
-    episodes = 100000
+    episodes = 50000
     number_of_rollouts = 100
-    test_after = 1000 #episodes
+    test_after = 100 #episodes
+    retrain = 20
+    
     acc_r_ave = np.zeros((int(episodes/test_after), 4))
     sim = Simulation()
-    for i in range(episodes):
-        print("--------------------------------------------------Episode", i)
-        sim.simulate(train=True)
-        sim.reset()
-        if (i+1) % test_after == 0:
-            acc_r = np.zeros((4))
-            for j in range(number_of_rollouts):
-                acc_r += np.array(sim.simulate(train=False))
-                sim.reset()
-            acc_r /= number_of_rollouts
-            acc_r_ave[int((i+1) / test_after)-1] = acc_r
-            print("Episode: ", i, " Accuracy: ", acc_r[0], " R: ", acc_r[1])
-
-    plt.plot(np.arange(len(acc_r_ave[:, 0].flatten())), acc_r_ave[:, 0].flatten())
-    plt.xlabel('x1000 Episodes (Taxi)')
-    plt.ylabel('Accuracy')
-    plt.savefig("Research/plots2/Taxi_JB_A_.png")
-    plt.clf()
+    
+    for p in range(retrain):
+        for i in range(episodes):
+            sim.simulate(train=True)
+            sim.reset()
+            if (i+1) % test_after == 0:
+                acc_r = np.zeros((4))
+                for j in range(number_of_rollouts):
+                    acc_r += np.array(sim.simulate(train=False))
+                    sim.reset()
+                acc_r /= number_of_rollouts
+                acc_r_ave[int((i+1) / test_after)-1] += acc_r
+                print("Itteration: ", p, "Episode: ", i)
+                print("Taxi | Accuracy: ", acc_r[0], " R: ", acc_r[1])
+                print("Frozen Lake | Accuracy: ", acc_r[2], " R: ", acc_r[3])
+                print("--------------------------------------------------------")
+                print()
+        sim.resetEverything()
+    
+    acc_r_ave = acc_r_ave/retrain
+    
+    #plt.plot(np.arange(len(acc_r_ave[:, 0].flatten())), acc_r_ave[:, 0].flatten())
+    #plt.xlabel('x1000 Episodes (Taxi)')
+    #plt.ylabel('Accuracy')
+    #plt.savefig("Research/Plots_Joint_Bad/Taxi_A.png")
+    #plt.clf()
     
     plt.plot(np.arange(len(acc_r_ave[:, 1].flatten())), acc_r_ave[:, 1].flatten())
     #plt.plot(np.arange(len(R_values)), np.ones(len(R_values))*0.0688909)
     plt.xlabel('x1000 Episodes (Taxi)')
     plt.ylabel('Discounted Return')
-    plt.savefig("Research/plots2/Taxi_JB_R_.png")
+    plt.savefig("Plots_Joint_Bad/Taxi_Return.png")
     plt.clf()
     
     plt.plot(np.arange(len(acc_r_ave[:, 2].flatten())), acc_r_ave[:, 2].flatten())
     plt.xlabel('x1000 Episodes (Frozen Lake)')
     plt.ylabel('Accuracy')
-    plt.savefig("Research/plots2/FL_JB_A_.png")
+    plt.savefig("Plots_Joint_Bad/FrozenLake_A_.png")
     plt.clf()
     
     plt.plot(np.arange(len(acc_r_ave[:, 3].flatten())), acc_r_ave[:, 3].flatten())
     # plt.plot(np.arange(len(R_value)), np.ones(len(R_values))*0.0688909)
     plt.xlabel('x1000 Episodes (Frozen Lake)')
     plt.ylabel('Discounted Return')
-    plt.savefig("Research/plots2/FL_JB_R_.png")
+    plt.savefig("Plots_Joint_Bad/FrozenLake_Return.png")
     plt.clf()
     
-    plt.plot(np.arange(len(acc_r_ave[:, 1].flatten())), (acc_r_ave[:, 1].flatten()*0.000175)+0.07, label="Taxi")
+    plt.plot(np.arange(len(acc_r_ave[:, 1].flatten())), acc_r_ave[:, 1].flatten(), label="Taxi")# (acc_r_ave[:, 1].flatten()*0.000175)+0.07
     plt.plot(np.arange(len(acc_r_ave[:, 3].flatten())), acc_r_ave[:, 3].flatten(), label="Frozen Lake")
     plt.legend()
     plt.xlabel('x1000 Episodes (Frozen Lake / Taxi)')
     plt.ylabel('Discounted Return')
-    plt.savefig("Research/plots2/FLMC_JB_R_.png")
+    plt.savefig("Plots_Joint_Bad/FrozenLake_Taxi_Return.png")
     plt.clf()
     
-    np.save("Research/data5/joint_bad.npy", acc_r_ave)
+    np.save("Data/joint_bad.npy", acc_r_ave)

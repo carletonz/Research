@@ -10,7 +10,10 @@ class QLearning:
         self.alpha = 0.007
         self.gamma = 0.9
         self.epsilon = 0.2
-
+    
+    def reset(self):
+        self.QFunction = np.zeros(self.QFunction.shape)
+    
     # Gets the next action to take given the current state
     # Uses gama to decide when to randomly select an action (Explore) and when to select based on Q value (Exploit)
     def get_action(self, s, best = False):
@@ -40,7 +43,11 @@ class Simulation:
         self.done = False
 
         self.env.reset()
-
+    
+    def resetEverything(self):
+        self.agent.reset()
+        self.reset()
+    
     def reset(self):
         self.env.reset()
         self.R = 0
@@ -67,35 +74,44 @@ class Simulation:
 
 if __name__ == "__main__":
     episodes = 50000
-    number_of_rollouts = 1000
-    accuracy_values = []
-    R_values = []
+    number_of_rollouts = 100
+    test_after = 100 #episodes
+    retrain = 20 #times
+    
+    acc_r_ave = np.zeros((int(episodes/test_after), 2))
     sim = Simulation()
-    for i in range(episodes):
-        sim.simulate(train=True)
-        sim.reset()
-        if i % 100 == 0:
-            accuracy = 0
-            R_ave = 0
-            for j in range(number_of_rollouts):
-                success, R = sim.simulate(train=False)
-                sim.reset()
-                accuracy += success
-                R_ave += R
-            accuracy_values.append(accuracy/number_of_rollouts)
-            R_values.append(R_ave/number_of_rollouts)
-            print("Episode: ", i, " Accuracy: ", accuracy/number_of_rollouts, " R: ", R_ave/number_of_rollouts)
+    
+    for p in range(retrain):
+        for i in range(episodes):
+            sim.simulate(train=True)
+            sim.reset()
+            if (i+1) % test_after == 0:
+                acc_r = np.zeros((2))
+                for j in range(number_of_rollouts):
+                    acc_r += np.array(sim.simulate(train=False))
+                    sim.reset()
+                acc_r /= number_of_rollouts
+                acc_r_ave[int((i+1) / test_after)-1] += acc_r
+                print("Itteration: ", p, "Episode: ", i)
+                print("FrozenLake | Accuracy: ", acc_r[0], " R: ", acc_r[1])
+                print("--------------------------------------------------------")
+                print()
+        sim.resetEverything()
+    
+    acc_r_ave = acc_r_ave/retrain
 
-    plt.plot(np.arange(len(accuracy_values)), accuracy_values)
+    plt.plot(np.arange(len(acc_r_ave[:, 0].flatten())), acc_r_ave[:, 0].flatten())
     plt.xlabel('x100 Episodes')
     plt.ylabel('Accuracy')
-    plt.show()
+    plt.savefig("Q-Learning/FrozenLake_Accuracy.png")
+    plt.clf()
 
     # Expected discounted return
     # stochastic: 0.0688909
     # non-stochastic: 0.59049
-    plt.plot(np.arange(len(R_values)), R_values)
-    plt.plot(np.arange(len(R_values)), np.ones(len(R_values))*0.0688909)
+    plt.plot(np.arange(len(acc_r_ave[:, 1].flatten())), acc_r_ave[:, 1].flatten())
+    plt.plot(np.arange(len(acc_r_ave[:, 1].flatten())), np.ones(len(acc_r_ave[:, 1].flatten()))*0.0688909)
     plt.xlabel('x100 Episodes')
     plt.ylabel('Discounted Return')
-    plt.show()
+    plt.savefig("Q-Learning/FrozenLake_Return.png")
+    plt.clf()

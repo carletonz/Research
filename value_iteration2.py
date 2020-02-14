@@ -5,6 +5,21 @@ env = gym.make('Taxi-v3')
 V = np.zeros(env.nS)
 gamma = 0.9
 print(env.P)
+
+r = []
+
+
+for i in range(1):
+    for s in range(env.nS):
+        temp = []
+        for a in range(env.nA):
+            [r.append(reward) for prob, next_state, reward, done in env.P[s][a]]
+
+r = np.array(r)
+print(np.max(r))
+print(np.min(r))
+
+'''
 for i in range(2000):
     for s in range(env.nS):
         temp = []
@@ -13,4 +28,6 @@ for i in range(2000):
         temp = np.array(temp)
         V[s] = np.max(temp)
 
-np.save("Taxi_value_itteration", V)
+#np.save("Taxi_value_itteration", V)
+
+'''
