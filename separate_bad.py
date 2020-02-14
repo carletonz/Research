@@ -117,7 +117,7 @@ if __name__ == "__main__":
     plt.plot(np.arange(len(acc_r_ave[:, 1].flatten())), np.ones(len(acc_r_ave[:, 1].flatten()))*0.0688909)
     plt.xlabel('x100 Episodes')
     plt.ylabel('Discounted Return')
-    plt.savefig("Plots_Joint_Good/FrozenLake_Return.png")
+    plt.savefig("Plots_Separate_Bad/FrozenLake_Return.png")
     plt.clf()
     
     np.save("Data/separate_bad.npy", acc_r_ave)
