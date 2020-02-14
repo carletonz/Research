@@ -21,6 +21,7 @@ For the next 4 sections our goal is to show that in certain situations a joint a
 # Joint: Good (Frozen Lake)
 ### Stochastic Environment
 For this example we will be looking at a joint agent (i.e. an agent that chooses 2 actions to do at every time step). We will use the frozen lake environment for this example. One of the actions is to go in the horizontal or verticle direction. The other action is to go in the positive or negative direction. Conceptually this is the same as the stochastic environment in the Q-learning section above.
+
 ![](https://github.com/carletonz/Research/raw/master/Plots_Joint_Good/FrozenLake_Accuracy.png)
 
 We define accuracy as the number of times the agent got to its goal in the frozen lake environment divided by the total number of attempts. To obtain this graph we averaged the accuracy of the agent over 100 rollouts every 100th episode. As seen in the graph the agent reaches its maximum accuracy (about 70%) around episode 15000.
