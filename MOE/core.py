@@ -145,7 +145,7 @@ class MixtureOfExperts(nn.Module):
                     temp.append(self.experts[i](x) * w[task][i])
             x = sum(temp)
         
-        x = self.taskHeads[task[0]](x)
+        x = self.taskHeads[task](x)
         return x
     
     def set_training(train = True):
