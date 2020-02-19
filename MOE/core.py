@@ -52,17 +52,17 @@ class Expert_linear(nn.Module):
         
         return x
 
-# Decide to use a specific expert on a task, output should be a vector of 1s and 0s of length # of tasks
+# Decide to use a specific expert on a task
 # Weights decide how much each expert matters
 # (b / w)
 class Gating(nn.Module):
     def __init__(self):
         super(Gating, self)
-        self.hl1 = nn.Linear(T, 120)
+        self.hl1 = nn.Linear(N, 120)
         self.hl2 = nn.Linear(120, 84)
-        self.hl3 = nn.Linear(84, T*M)
+        self.hl3 = nn.Linear(84, N*M)
         
-        self.logits = nn.Parameters(torch.zeros([T, M]))
+        self.logits = nn.Parameters(torch.zeros([N, M]))
         self.logits_loss = 0
     
     def forward(self, x):
@@ -74,7 +74,7 @@ class Gating(nn.Module):
         
         # one hot encoding
         # task numbers start from 0
-        x = torch.zeros([T])
+        x = torch.zeros([N])
         x[task] = 1
         
         x = F.relu(self.hl1(x))
@@ -84,20 +84,20 @@ class Gating(nn.Module):
         b = bernoulli.sample()
         self.logits_loss = torch.sum(torch.log(bernoulli.probs())[task])
         
-        return x.view(T,M) * b
+        return x.view(N,M) * b
     
-    def get_loss(inputs, targets):
+    def get_loss(inputs):
         return self.logits_loss * inputs.detach()
 
 # Task Head for each task
-# A is the size of the output space for each task
+# 'a' is the size of the output space for each task
 # (g)
 class Task(nn.Module):
-    def __init__(self, A):
+    def __init__(self, task_output_size):
         super(Task, self)
         self.hl1 = nn.Linear(CONNECTION_SIZE, 120)
         self.hl2 = nn.Linear(120, 84)
-        self.hl3 = nn.Linear(84, A)
+        self.hl3 = nn.Linear(84, task_output_size)
     
     def forward(self, x):
         x = F.relu(self.hl1(x))
@@ -105,8 +105,9 @@ class Task(nn.Module):
         x = self.hl3(x)
         return x
 
+# (m)
 class MixtureOfExperts(nn.Module):
-    def __init__(self, task_info, input_type="I", input_size=None):
+    def __init__(self, task_output_size, input_type="I", input_size=None):
         super(MixtureOfExperts, self)
         self.experts = None
         if input_type == "I":
@@ -122,7 +123,7 @@ class MixtureOfExperts(nn.Module):
         
         self.gates = Gating()
         self.taskHeads = nn.ModuleList([
-                Task(task_info.nA) for i in range(M)
+                Task(task_output_size) for i in range(M)
             ])
         
         self.train = True
@@ -136,14 +137,14 @@ class MixtureOfExperts(nn.Module):
         if self.train:
             # pass x to all experts
             x = [self.experts[i](x) * w[task][i] for i in range(M)]
-            x = sum(x)
+            x = sum(x) # (z)
         else:
             # pass x to experts where weights are greater than 0
             temp = []
             for i in range(M):
                 if w[task][i] > 0:
                     temp.append(self.experts[i](x) * w[task][i])
-            x = sum(temp)
+            x = sum(temp) # (z)
         
         x = self.taskHeads[task](x)
         return x
@@ -151,7 +152,28 @@ class MixtureOfExperts(nn.Module):
     def set_training(train = True):
         self.train = train
     
-    def get_loss(inputs, targets):
-        loss = self.gates.get_loss(inputs, targets)
+    def get_loss(inputs):
+        loss = self.gates.get_loss(inputs)
         loss = loss + inputs
         return loss
+
+if __name__ == "__main__":
+    task = 0
+    input_type = "I"
+    task_output_size = 6
+    inputs = None # todo: get actual inputs
+    label = None # todo: get actual labels
+    
+    moe = MixtureOfExperts(task_output_size, input_type)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(moe.parameters(), lr=0.001, momentum=0.9)
+    
+    output = moe(inputs, task)
+    output, action = torch.max(output, 0)
+    
+    optimizer.zero_grad()
+    loss = criterion(output, label)
+    loss = moe.get_loss(loss)
+    
+    loss.backward()
+    optimizer.step()
