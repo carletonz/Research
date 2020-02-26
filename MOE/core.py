@@ -25,32 +25,30 @@ class Expert_conv(nn.Module):
         self.fc3 = nn.Linear(84, CONNECTION_SIZE)
     
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
+        conv1_output = self.pool(F.relu(self.conv1(x)))
+        conv2_output = self.pool(F.relu(self.conv2(conv1_output)))
         
-        x = x.view(-1, 16*5*5)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        reshape_output = conv1_output.view(-1, 16*5*5)
+        fc1_output = F.relu(self.fc1(reshape_output))
+        fc2_output = F.relu(self.fc2(fc1_output))
+        y = self.fc3(fc2_output)
         
-        x = self.fc3(x)
-        
-        return x
+        return y
 
 # experts where inputs are vectors
 # (f)
 class Expert_linear(nn.Module):
     def __init__(self, input_size):
         super(Expert_linear, self)
-        self.fc1 = nn.Linear(input_size, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, CONNECTION_SIZE)
+        self.hl1 = nn.Linear(input_size, 120)
+        self.hl2 = nn.Linear(120, 84)
+        self.hl3 = nn.Linear(84, CONNECTION_SIZE)
     
     def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        
-        return x
+        hl1_output = F.relu(self.hl1(x))
+        hl2_output = F.relu(self.hl2(hl1_output))
+        y = self.hl3(hl2_output)
+        return y
 
 # Decide to use a specific expert on a task
 # Weights decide how much each expert matters
@@ -58,36 +56,24 @@ class Expert_linear(nn.Module):
 class Gating(nn.Module):
     def __init__(self):
         super(Gating, self)
-        self.hl1 = nn.Linear(N, 120)
-        self.hl2 = nn.Linear(120, 84)
-        self.hl3 = nn.Linear(84, N*M)
-        
+        self.weights = nn.Parameters(torch.zeros([N, M]))
         self.logits = nn.Parameters(torch.zeros([N, M]))
-        self.logits_loss = 0
     
-    def forward(self, x):
+    def forward(self, x, extra_loss):
         """
-        :param x: tensor containing a task number
+        :param x: outputs from experts M x F
+        :param task
+        :return N x M x F
         """
         bernoulli = torch.Bernoulli(logits=self.logits)
-        task = x
-        
-        # one hot encoding
-        # task numbers start from 0
-        x = torch.zeros([N])
-        x[task] = 1
-        
-        x = F.relu(self.hl1(x))
-        x = F.relu(self.hl2(x))
-        x = self.hl3(x)
         
         b = bernoulli.sample()
-        self.logits_loss = torch.sum(torch.log(bernoulli.probs())[task])
+        w = self.weights * b
+        logits_loss = torch.sum(torch.log(bernoulli.probs()), 0)
         
-        return x.view(N,M) * b
-    
-    def get_loss(inputs):
-        return self.logits_loss * inputs.detach()
+        output = torch.tensor([x * w[i:i+1].t() for i in range(N)])
+        
+        return output, extra_loss + logits_loss
 
 # Task Head for each task
 # 'a' is the size of the output space for each task
@@ -100,24 +86,27 @@ class Task(nn.Module):
         self.hl3 = nn.Linear(84, task_output_size)
     
     def forward(self, x):
-        x = F.relu(self.hl1(x))
-        x = F.relu(self.hl2(x))
-        x = self.hl3(x)
-        return x
+        hl1_output = F.relu(self.hl1(x))
+        hl2_output = F.relu(self.hl2(hl1_output))
+        y = self.hl3(hl2_output)
+        return y
 
 # (m)
 class MixtureOfExperts(nn.Module):
     def __init__(self, task_output_size, input_type="I", input_size=None):
         super(MixtureOfExperts, self)
         self.experts = None
+        self.expert_type = None
         if input_type == "I":
             self.experts = nn.ModuleList([
                 Expert_conv() for i in range(M)
             ])
+            self.expert_type = 0
         elif input_type == "V" and input_size != None:
             self.experts = nn.ModuleList([
                 Expert_linear(input_size) for i in range(M)
             ])
+            self.expert_type = 1
         else:
             raise ValueError()
         
@@ -130,35 +119,51 @@ class MixtureOfExperts(nn.Module):
     
     def forward(self, x, task):
         """
-        :param x: tensor containing an image / state / observation / etc.
+        :param x: tensor containing a batch of images / states / observations / etc.
         :param task: tensor containing a task number
         """
-        w = self.gates(task)
-        if self.train:
-            # pass x to all experts
-            x = [self.experts[i](x) * w[task][i] for i in range(M)]
-            x = sum(x) # (z)
-        else:
-            # pass x to experts where weights are greater than 0
-            temp = []
-            for i in range(M):
-                if w[task][i] > 0:
-                    temp.append(self.experts[i](x) * w[task][i])
-            x = sum(temp) # (z)
+        # makes sure experts are batched and have correct number of input dimentions
+        if self.expert_type == 0 and len(x.shape) != 3: # Images
+            raise ValueError()
+        if self.expert_type == 1 and len(x.shape) != 2: # Vectors
+            raise ValueError()
         
-        x = self.taskHeads[task](x)
-        return x
+        B = x.shape[0] # batch size
+        
+        # in: B x width x height
+        # out: B x M x F
+        expert_output = torch.tensor([self.call_all_experts(x[b]) for b in range(B)])
+        
+        # in: B x M x F
+        # out: B x N x F
+        gates_output = []
+        self.cumulative_logits_loss = torch.zeros(N)
+        for b in range(B):
+            out, self.cumulative_logits_loss = self.gates(expert_output[b], cumulative_logits_loss)
+            gates_output.append(out)
+        gates_output = torch.sum(torch.tensor(gates_output), 2)
+        
+        # in: B x N x F
+        # out: B x N x O
+        # question: output for all tasks?
+        taskHead_output = [self.taskHeads[i](gates_output[i]) for i in range(B)]
+        return taskHead_output
     
-    def set_training(train = True):
-        self.train = train
+    def call_all_experts(x):
+        """
+        :param x : single image width x height
+        :return B x F
+        """
+        
+        return torch.tensor([self.experts[i](x) for i in range(M)])
     
-    def get_loss(inputs):
-        loss = self.gates.get_loss(inputs)
-        loss = loss + inputs
-        return loss
+    def get_loss(loss):
+        logits_loss = self.cumulative_logits_loss * loss.detach()
+        total_loss = logits_loss + loss
+        return total_loss
 
 if __name__ == "__main__":
-    task = 0
+    task = torch.tensor(0)
     input_type = "I"
     task_output_size = 6
     inputs = None # todo: get actual inputs
