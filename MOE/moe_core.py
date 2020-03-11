@@ -37,6 +37,11 @@ class Expert_conv(nn.Module):
         
         return y
 
+    def output_size(self, x, y):
+        x = int(x)
+        y = int(y)
+        return int((x-5)/2) + ((x-5)%2), int((y-5)/2) + ((y-5)%2)
+
 # experts where inputs are vectors
 # (f)
 class Expert_linear(nn.Module):
@@ -63,20 +68,21 @@ class Gating(nn.Module):
     
     def forward(self, x, extra_loss):
         """
-        :param x: outputs from experts M x F
-        :param task
-        :return M x N x B x F
+        :param x: outputs from experts B x M x F
+        :param extra_loss
+        :return B x N x F : 
         """
-        bernoulli = torch.Bernoulli(logits=self.logits)
+        bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
         
         b = bernoulli.sample()
         w = self.weights * b
-        logits_loss = torch.sum(torch.log(bernoulli.probs()), 0)
+        # depeds on b
+        # should be a funcition for log probs
+        logits_loss = torch.sum(bernoulli.log_prob(b), 0)
         
-        #outer product
-        output = torch.einsum('bp, bqr->bpqr', w, x)
-        
-        return output, extra_loss + logits_loss
+        #outer product, sum
+        output = torch.einsum('mn, bmf->bnf', w, x)# need to be all the same type
+        return summed_output, extra_loss + logits_loss
 
 # Task Head for each task
 # 'a' is the size of the output space for each task
@@ -96,18 +102,19 @@ class Task(nn.Module):
 
 # (m)
 class MixtureOfExperts(nn.Module):
-    def __init__(self, task_output_size, input_type="I", input_size=None):
+    def __init__(self, input_size, task_output_size, input_type="V"):
         super(MixtureOfExperts, self).__init__()
         self.experts = None
         self.expert_type = None
-        if input_type == "I":
+        if input_type == "I": # image
             self.experts = nn.ModuleList([
                 Expert_conv() for i in range(M)
             ])
             self.expert_type = 0
-        elif input_type == "V" and input_size != None:
+        elif input_type == "V": # vector
+            size = sum([input_size[i].shape[0] for i in range(len(input_size))])
             self.experts = nn.ModuleList([
-                Expert_linear(input_size) for i in range(M)
+                Expert_linear(size) for i in range(M)
             ])
             self.expert_type = 1
         else:
@@ -115,12 +122,12 @@ class MixtureOfExperts(nn.Module):
         
         self.gates = Gating()
         self.taskHeads = nn.ModuleList([
-                Task(task_output_size) for i in range(M)
+                Task(task_output_size[i].shape[0]) for i in range(N)
             ])
         
         self.train = True
     
-    def forward(self, x, task):
+    def forward(self, x):
         """
         :param x: tensor containing a batch of images / states / observations / etc.
         :param task: tensor containing a task number
@@ -134,24 +141,26 @@ class MixtureOfExperts(nn.Module):
         B = x.shape[0] # batch size
         
         # in: B x width x height
-        # out: M x B x F
-        expert_output = torch.stack([self.experts[i](x) for i in range(M)])
+        # out: B x M x F
+        expert_output = torch.stack([self.experts[i](x) for i in range(M)], dim = 1)
         
-        # in: M x B x F
-        # out: N x B x F
+        # in: B x M x F
+        # out: B x N x F
         self.cumulative_logits_loss = torch.zeros(N)
-        gates_output, logits_loss = self.gates(expert_output, logits_loss)
-        gates_output = torch.sum(torch.tensor(gates_output), 0)
+        gates_output, self.cumulative_logits_loss = self.gates(expert_output, logits_loss)
         
-        # in: N x B x F
-        # out: N x B x O
-        taskHead_output = [self.taskHeads[i](gates_output[i]) for i in range(N)]
+        # in: B x N x F
+        # out: B x O
+        # O is the sum of all task output sizes
+        # cancatinate this so all task outputs are in the same dimention
+        taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i]) for i in range(N)], dim=1)
         return taskHead_output
     
     def get_loss(loss):
         logits_loss = self.cumulative_logits_loss * loss.detach()
         total_loss = logits_loss + loss
         return total_loss
+
 
 if __name__ == "__main__":
     task = torch.tensor(0)
