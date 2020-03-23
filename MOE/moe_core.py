@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 M = 10 # Number of experts
-N = 100 # Number of tasks
+N = 5 # Number of tasks
 CONNECTION_SIZE = 10 # output size of expert and input size of task head
 
 # expert where inputs are color images
@@ -22,7 +22,7 @@ class Expert_conv(nn.Module):
         self.conv2 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5) # padding 0
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.fc1 = nn.Linear(16*5*5, 120)
+        self.fc1 = nn.Linear(16*22*22, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, CONNECTION_SIZE)
     
@@ -30,7 +30,7 @@ class Expert_conv(nn.Module):
         conv1_output = self.pool(F.relu(self.conv1(x)))
         conv2_output = self.pool(F.relu(self.conv2(conv1_output)))
         
-        reshape_output = conv1_output.view(-1, 16*5*5)
+        reshape_output = conv1_output.view(-1, 16*22*22)
         fc1_output = F.relu(self.fc1(reshape_output))
         fc2_output = F.relu(self.fc2(fc1_output))
         y = self.fc3(fc2_output)
@@ -82,7 +82,7 @@ class Gating(nn.Module):
         
         #outer product, sum
         output = torch.einsum('mn, bmf->bnf', w, x)# need to be all the same type
-        return summed_output, extra_loss + logits_loss
+        return output, extra_loss + logits_loss
 
 # Task Head for each task
 # 'a' is the size of the output space for each task
@@ -112,9 +112,8 @@ class MixtureOfExperts(nn.Module):
             ])
             self.expert_type = 0
         elif input_type == "V": # vector
-            size = sum([input_size[i].shape[0] for i in range(len(input_size))])
             self.experts = nn.ModuleList([
-                Expert_linear(size) for i in range(M)
+                Expert_linear(input_size) for i in range(M)
             ])
             self.expert_type = 1
         else:
@@ -122,7 +121,7 @@ class MixtureOfExperts(nn.Module):
         
         self.gates = Gating()
         self.taskHeads = nn.ModuleList([
-                Task(task_output_size[i].shape[0]) for i in range(N)
+                Task(task_output_size[i]) for i in range(N)
             ])
         
         self.train = True
@@ -134,9 +133,9 @@ class MixtureOfExperts(nn.Module):
         """
         # makes sure experts are batched and have correct number of input dimentions
         if self.expert_type == 0 and len(x.shape) != 3: # Images
-            raise ValueError()
+            raise ValueError("Expecting batched images, got {}".format(x.shape))
         if self.expert_type == 1 and len(x.shape) != 2: # Vectors
-            raise ValueError()
+            raise ValueError("Expecting batched vectors, got {}".format(x.shape))
         
         B = x.shape[0] # batch size
         
@@ -147,7 +146,7 @@ class MixtureOfExperts(nn.Module):
         # in: B x M x F
         # out: B x N x F
         self.cumulative_logits_loss = torch.zeros(N)
-        gates_output, self.cumulative_logits_loss = self.gates(expert_output, logits_loss)
+        gates_output, self.cumulative_logits_loss = self.gates(expert_output, self.cumulative_logits_loss)
         
         # in: B x N x F
         # out: B x O
@@ -156,29 +155,31 @@ class MixtureOfExperts(nn.Module):
         taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i]) for i in range(N)], dim=1)
         return taskHead_output
     
-    def get_loss(loss):
+    def get_loss(self, loss):
         logits_loss = self.cumulative_logits_loss * loss.detach()
         total_loss = logits_loss + loss
-        return total_loss
+        return total_loss.sum()
 
 
 if __name__ == "__main__":
-    task = torch.tensor(0)
-    input_type = "I"
-    task_output_size = 6
-    inputs = None # todo: get actual inputs
-    label = None # todo: get actual labels
+    input_type = "V"
+    task_output_size = list(range(N))
+    input_size = 20
+    batches = 50
+    output_size = int(sum(task_output_size))
     
-    moe = MixtureOfExperts(task_output_size, input_type)
+    moe = MixtureOfExperts(input_size, task_output_size, input_type)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(moe.parameters(), lr=0.001, momentum=0.9)
     
-    output = moe(inputs, task)
-    output, action = torch.max(output, 0)
-    
-    optimizer.zero_grad()
-    loss = criterion(output, label)
-    loss = moe.get_loss(loss)
-    
-    loss.backward()
-    optimizer.step()
+    for i in range(5):
+        inputs = torch.randn(batches, input_size)
+        label = torch.randint(0, output_size, (batches,))
+
+        output = moe(inputs)
+        #output, action = torch.max(output, 0)
+        optimizer.zero_grad()
+        loss = criterion(output, label)
+        loss = moe.get_loss(loss)
+        loss.backward()
+        optimizer.step()
