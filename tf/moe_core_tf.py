@@ -3,6 +3,7 @@
 # https://github.com/AndyLc/mtl-multi-clustering
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow import keras
 
 M = 10 # Number of experts
@@ -40,28 +41,21 @@ def Expert_linear(input_shape):
 # Decide to use a specific expert on a task
 # Weights decide how much each expert matters
 # (b / w)
-class Gating(nn.Module):
+class Gating(keras.layers.Layer):
     def __init__(self):
         super(Gating, self).__init__()
-        self.weights = nn.Parameter(torch.zeros([M, N]))
-        self.logits = nn.Parameter(torch.zeros([M, N]))
-    
-    def forward(self, x, extra_loss):
-        """
-        :param x: outputs from experts B x M x F
-        :param extra_loss
-        :return B x N x F : 
-        """
-        bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
-        
+        self.weights = self.add_weight(shape=(M, N), initializer='zeros', trainable=True)
+        self.logits = self.add_wieght(shape=(M, N), initializer='zeros', trainable=True)
+
+    def call(self, x, extra_loss):
+        bernoulli = tfp.distributions.Bernoulli(logits = self.logits)
+
         b = bernoulli.sample()
         w = self.weights * b
-        # depeds on b
-        # should be a funcition for log probs
-        logits_loss = torch.sum(bernoulli.log_prob(b), 0)
-        
-        #outer product, sum
-        output = torch.einsum('mn, bmf->bnf', w, x)# need to be all the same type
+
+        logits_loss = tf.math.reduce_sum(bernoulli.log_prob(b), 0)
+
+        output = tf.einsum('mn,bnf->bnf')
         return output, extra_loss + logits_loss
 
 # Task Head for each task
