@@ -3,14 +3,14 @@
 # https://github.com/AndyLc/mtl-multi-clustering
 
 import torch
-import torchvision
-import torchvision.transforms as transforms
+#import torchvision
+#import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-M = 10 # Number of experts
-N = 5 # Number of tasks
+M = 3 # Number of experts
+N = 2 # Number of tasks
 CONNECTION_SIZE = 10 # output size of expert and input size of task head
 
 # expert where inputs are color images
@@ -47,11 +47,13 @@ class Expert_conv(nn.Module):
 class Expert_linear(nn.Module):
     def __init__(self, input_size):
         super(Expert_linear, self).__init__()
+        print(input_size)
         self.hl1 = nn.Linear(input_size, 120)
         self.hl2 = nn.Linear(120, 84)
         self.hl3 = nn.Linear(84, CONNECTION_SIZE)
     
     def forward(self, x):
+        print(x.shape)
         hl1_output = F.relu(self.hl1(x))
         hl2_output = F.relu(self.hl2(hl1_output))
         y = self.hl3(hl2_output)
@@ -181,5 +183,6 @@ if __name__ == "__main__":
         optimizer.zero_grad()
         loss = criterion(output, label)
         loss = moe.get_loss(loss)
+        print(loss)
         loss.backward()
         optimizer.step()

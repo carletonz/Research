@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
-
+from torch_v import moe_core_torch
 
 def combined_shape(length, shape=None):
     if shape is None:
@@ -80,7 +80,7 @@ class MLPQFunction(nn.Module):
 class MLPActorCritic(nn.Module):
 
     def __init__(self, observation_space, action_space, hidden_sizes=(256,256),
-                 activation=nn.ReLU):
+                 activation=nn.ReLU, env=None):
         super().__init__()
 
         obs_dim = observation_space.shape[0]
@@ -88,7 +88,7 @@ class MLPActorCritic(nn.Module):
         act_limit = action_space.high[0]
 
         # build policy and value functions
-        self.pi = SquashedGaussianMLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit)
+        self.pi = moe_core_torch.MixtureOfExperts(env.obs_splits, env.action_sizes)
         self.q1 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
         self.q2 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
 
