@@ -1,6 +1,7 @@
-import spinup
+import sac
 import gym
 import torch
+import time
 from utils import EnvSet
 from sac_core import MLPActorCritic
 
@@ -13,5 +14,5 @@ def create_cheetah_env():
 def create_env():
     return EnvSet([create_ant_env, create_cheetah_env])
 
-spinup.sac_pytorch(create_env, MLPActorCritic, epochs=5)
+sac.sac(create_env, MLPActorCritic, epochs=100, ac_kwargs={"hidden_sizes":(256, 14)} , logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-%i"%int(time.time())})
 

@@ -47,13 +47,11 @@ class Expert_conv(nn.Module):
 class Expert_linear(nn.Module):
     def __init__(self, input_size):
         super(Expert_linear, self).__init__()
-        print(input_size)
         self.hl1 = nn.Linear(input_size, 120)
         self.hl2 = nn.Linear(120, 84)
         self.hl3 = nn.Linear(84, CONNECTION_SIZE)
     
     def forward(self, x):
-        print(x.shape)
         hl1_output = F.relu(self.hl1(x))
         hl2_output = F.relu(self.hl2(hl1_output))
         y = self.hl3(hl2_output)
@@ -74,6 +72,13 @@ class Gating(nn.Module):
         :param extra_loss
         :return B x N x F : 
         """
+        testing = False # are we trying to predict? predicting means only one observation at a time
+        # 2 dimentions because for every observation there is one dimention for experts and another
+        # dimention for tasks, undo after processing task head
+        if len(x.shape) == 2:
+            testing = True
+            x = x.view(1, M, CONNECTION_SIZE)
+
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
         
         b = bernoulli.sample()
@@ -84,6 +89,7 @@ class Gating(nn.Module):
         
         #outer product, sum
         output = torch.einsum('mn, bmf->bnf', w, x)# need to be all the same type
+
         return output, extra_loss + logits_loss
 
 # Task Head for each task
@@ -134,9 +140,9 @@ class MixtureOfExperts(nn.Module):
         :param task: tensor containing a task number
         """
         # makes sure experts are batched and have correct number of input dimentions
-        if self.expert_type == 0 and len(x.shape) != 3: # Images
+        if self.expert_type == 0 and len(x.shape) > 3: # Images
             raise ValueError("Expecting batched images, got {}".format(x.shape))
-        if self.expert_type == 1 and len(x.shape) != 2: # Vectors
+        if self.expert_type == 1 and len(x.shape) > 2: # Vectors
             raise ValueError("Expecting batched vectors, got {}".format(x.shape))
         
         B = x.shape[0] # batch size
@@ -155,6 +161,11 @@ class MixtureOfExperts(nn.Module):
         # O is the sum of all task output sizes
         # cancatinate this so all task outputs are in the same dimention
         taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i]) for i in range(N)], dim=1)
+        
+        # remove batch dimention if there is only one observation being processed
+        if taskHead_output.shape[0] == 1:
+            taskHead_output = taskHead_output[0]
+
         return taskHead_output
     
     def get_loss(self, loss):

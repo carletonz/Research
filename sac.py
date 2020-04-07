@@ -5,7 +5,8 @@ import torch
 from torch.optim import Adam
 import gym
 import time
-import sac_core as core
+import spinup.algos.pytorch.sac.core as core
+import sac_core as core2
 from spinup.utils.logx import EpochLogger
 
 
@@ -42,11 +43,11 @@ class ReplayBuffer:
 
 
 
-def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0, 
+def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
         update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, 
-        logger_kwargs=dict(), save_freq=1):
+        logger_kwargs=dict(), save_freq=1, baseline=False):
     """
     Soft Actor-Critic (SAC)
 
@@ -158,7 +159,7 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     act_limit = env.action_space.high[0]
 
     # Create actor-critic module and target networks
-    ac = actor_critic(env.observation_space, env.action_space, **ac_kwargs)
+    ac = actor_critic(env.observation_space, env.action_space, env = None if baseline else env, **ac_kwargs)
     ac_targ = deepcopy(ac)
 
     # Freeze target networks with respect to optimizers (only update via polyak averaging)
@@ -269,18 +270,21 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     def test_agent():
         for j in range(num_test_episodes):
-            o, d, ep_ret, ep_len = test_env.reset(), False, 0, 0
+            o, d, ep_ret, ep_len, info = test_env.reset(), False, 0, 0, np.zeros(len(test_env))
             while not(d or (ep_len == max_ep_len)):
-                # Take deterministic actions at test time 
-                o, r, d, _ = test_env.step(get_action(o, True))
+                # Take deterministic actions at test time
+                o, r, d, i = test_env.step(get_action(o, True))
                 ep_ret += r
                 ep_len += 1
+                info += i
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
+            for i in range(len(info)):
+                logger.store(**{'TestEnv'+str(i)+'Ret': info[i]})
 
     # Prepare for interaction with environment
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
-    o, ep_ret, ep_len = env.reset(), 0, 0
+    o, ep_ret, ep_len, info = env.reset(), 0, 0, np.zeros(len(env))
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
@@ -294,9 +298,10 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             a = env.action_space.sample()
 
         # Step the env
-        o2, r, d, _ = env.step(a)
+        o2, r, d, i = env.step(a)
         ep_ret += r
         ep_len += 1
+        info += i
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -313,7 +318,9 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         # End of trajectory handling
         if d or (ep_len == max_ep_len):
             logger.store(EpRet=ep_ret, EpLen=ep_len)
-            o, ep_ret, ep_len = env.reset(), 0, 0
+            for i in range(len(info)):
+                logger.store(**{'Env'+str(i)+'Ret': info[i]})
+            o, ep_ret, ep_len, info = env.reset(), 0, 0, np.zeros(len(env))
 
         # Update handling
         if t >= update_after and t % update_every == 0:
@@ -334,6 +341,9 @@ def sac(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
             # Log info about epoch
             logger.log_tabular('Epoch', epoch)
+            for i in range(len(env)):
+                logger.log_tabular('TestEnv'+str(i)+'Ret', with_min_and_max=True)
+                logger.log_tabular('Env'+str(i)+'Ret', with_min_and_max=True)
             logger.log_tabular('EpRet', with_min_and_max=True)
             logger.log_tabular('TestEpRet', with_min_and_max=True)
             logger.log_tabular('EpLen', average_only=True)

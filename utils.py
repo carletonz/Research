@@ -24,16 +24,13 @@ class EnvSet(gym.Env):
     def step(self, action):
         # List of actions separated by environment
         a = np.split(action, self.action_splits)
-        print(self.action_splits)
         #List of observation, reward, done, info tuple for each environment
-        for i in range(len(self.envs)):
-            print(a[i])
         env_state = [self.envs[i].step(a[i]) for i in range(len(self.envs))]
-        
+
         obs = np.concatenate([env_state[i][0] for i in range(len(env_state))])
         reward = np.array([env_state[i][1] for i in range(len(env_state))]).sum()
         done = np.all([env_state[i][2] for i in range(len(env_state))])
-        info = [env_state[i][3] for i in range(len(env_state))]
+        info = np.array([env_state[i][1] for i in range(len(env_state))])
         
         return obs, reward, done, info
     
@@ -49,3 +46,6 @@ class EnvSet(gym.Env):
     
     def seed(self):
         pass
+
+    def __len__(self):
+        return len(self.envs)

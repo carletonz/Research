@@ -28,9 +28,12 @@ LOG_STD_MIN = -20
 
 class SquashedGaussianMLPActor(nn.Module):
 
-    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, act_limit):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, act_limit, env):
         super().__init__()
-        self.net = mlp([obs_dim] + list(hidden_sizes), activation, activation)
+        if env != None:
+            self.net = moe_core_torch.MixtureOfExperts(env.obs_splits, env.action_sizes)
+        else:
+            self.net = mlp([obs_dim] + list(hidden_sizes), activation, activation)
         self.mu_layer = nn.Linear(hidden_sizes[-1], act_dim)
         self.log_std_layer = nn.Linear(hidden_sizes[-1], act_dim)
         self.act_limit = act_limit
@@ -88,7 +91,11 @@ class MLPActorCritic(nn.Module):
         act_limit = action_space.high[0]
 
         # build policy and value functions
-        self.pi = moe_core_torch.MixtureOfExperts(env.obs_splits, env.action_sizes)
+        self.pi = SquashedGaussianMLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit, env)
+        
+        print(obs_dim)
+        print(act_dim)
+
         self.q1 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
         self.q2 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
 
