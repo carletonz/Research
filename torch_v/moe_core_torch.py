@@ -9,9 +9,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-M = 3 # Number of experts
+M = 10 # Number of experts
 N = 2 # Number of tasks
-CONNECTION_SIZE = 10 # output size of expert and input size of task head
+CONNECTION_SIZE = 50 # output size of expert and input size of task head
 
 # expert where inputs are color images
 # (f)
@@ -47,9 +47,9 @@ class Expert_conv(nn.Module):
 class Expert_linear(nn.Module):
     def __init__(self, input_size):
         super(Expert_linear, self).__init__()
-        self.hl1 = nn.Linear(input_size, 120)
-        self.hl2 = nn.Linear(120, 84)
-        self.hl3 = nn.Linear(84, CONNECTION_SIZE)
+        self.hl1 = nn.Linear(input_size, 220)
+        self.hl2 = nn.Linear(220, 200)
+        self.hl3 = nn.Linear(200, CONNECTION_SIZE)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))
@@ -98,9 +98,9 @@ class Gating(nn.Module):
 class Task(nn.Module):
     def __init__(self, task_output_size):
         super(Task, self).__init__()
-        self.hl1 = nn.Linear(CONNECTION_SIZE, 120)
-        self.hl2 = nn.Linear(120, 84)
-        self.hl3 = nn.Linear(84, task_output_size)
+        self.hl1 = nn.Linear(CONNECTION_SIZE, 220)
+        self.hl2 = nn.Linear(220, 200)
+        self.hl3 = nn.Linear(200, task_output_size)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))

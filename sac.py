@@ -218,6 +218,10 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
         # Useful info for logging
         pi_info = dict(LogPi=logp_pi.detach().numpy())
+        
+        # MOE has a custom loss function
+        if callable(getattr(ac.pi.net, "get_loss", None)):
+            loss_pi = ac.pi.net.get_loss(loss_pi)
 
         return loss_pi, pi_info
 
