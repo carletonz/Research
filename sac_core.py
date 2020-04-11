@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
-from torch_v import moe_core_torch
+from pytorch import moe_core_torch
 
 def combined_shape(length, shape=None):
     if shape is None:
