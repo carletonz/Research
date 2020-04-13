@@ -12,4 +12,4 @@ def create_cheetah_env():
 def create_env():
     return EnvSet([create_ant_env, create_cheetah_env])
 
-spinup.sac_pytorch(create_ant_env, epochs=100, logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/ant-baseline-%i"%int(time.time())})
+spinup.sac_pytorch(create_ant_env, epochs=200, steps_per_epoch=4000, logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/ant-baseline-%i"%int(time.time())})
