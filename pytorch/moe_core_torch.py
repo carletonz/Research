@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-M = 5 # Number of experts
+M = 2 # Number of experts
 N = 2 # Number of tasks
 CONNECTION_SIZE = 25 # output size of expert and input size of task head
 
@@ -65,6 +65,7 @@ class Gating(nn.Module):
         super(Gating, self).__init__()
         self.weights = nn.Parameter(torch.zeros([M, N]))
         self.logits = nn.Parameter(torch.zeros([M, N]))
+        #self.mapping = torch.eye(N)
     
     def forward(self, x, extra_loss):
         """
