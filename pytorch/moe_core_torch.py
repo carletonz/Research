@@ -9,8 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-M = 2 # Number of experts
-N = 2 # Number of tasks
+M = 1 # Number of experts
+N = 1 # Number of tasks
 CONNECTION_SIZE = 25 # output size of expert and input size of task head
 
 # expert where inputs are color images
@@ -65,7 +65,7 @@ class Gating(nn.Module):
         super(Gating, self).__init__()
         self.weights = nn.Parameter(torch.zeros([M, N]))
         self.logits = nn.Parameter(torch.zeros([M, N]))
-        #self.mapping = torch.eye(N)
+        self.mapping = torch.eye(N)
     
     def forward(self, x, extra_loss):
         """
@@ -82,8 +82,8 @@ class Gating(nn.Module):
 
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
         
-        b = bernoulli.sample()
-        w = self.weights * b
+        b = self.mapping#bernoulli.sample()
+        w = b#self.weights * b
         # depeds on b
         # should be a funcition for log probs
         logits_loss = torch.sum(bernoulli.log_prob(b), 0)
@@ -172,7 +172,7 @@ class MixtureOfExperts(nn.Module):
     def get_loss(self, loss):
         logits_loss = self.cumulative_logits_loss * loss.detach()
         total_loss = logits_loss + loss
-        return total_loss.sum()
+        return loss#total_loss.sum()
 
 
 if __name__ == "__main__":
