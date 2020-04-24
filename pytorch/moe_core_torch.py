@@ -172,7 +172,7 @@ class MixtureOfExperts(nn.Module):
     def get_loss(self, loss):
         logits_loss = self.cumulative_logits_loss * loss.detach()
         total_loss = logits_loss + loss
-        return loss#total_loss.sum()
+        return total_loss.sum()
 
 
 if __name__ == "__main__":
