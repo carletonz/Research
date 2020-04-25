@@ -83,7 +83,7 @@ class Gating(nn.Module):
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
         
         b = self.mapping#bernoulli.sample()
-        w = b#self.weights * b
+        w = self.weights * b
         # depeds on b
         # should be a funcition for log probs
         logits_loss = torch.sum(bernoulli.log_prob(b), 0)
