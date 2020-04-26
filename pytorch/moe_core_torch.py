@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-M = 1 # Number of experts
+M = 2 # Number of experts
 N = 1 # Number of tasks
 CONNECTION_SIZE = 25 # output size of expert and input size of task head
 
