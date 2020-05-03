@@ -74,24 +74,15 @@ class Gating(nn.Module):
         :param extra_loss
         :return B x N x F : 
         """
-        testing = False # are we trying to predict? predicting means only one observation at a time
-        # 2 dimentions because for every observation there is one dimention for experts and another
-        # dimention for tasks, undo after processing task head
-        if len(x.shape) == 2:
-            testing = True
-            x = x.view(1, M, CONNECTION_SIZE)
-
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
-        
+            
         b = self.mapping#bernoulli.sample()
         w = b#self.weights * b
         # depeds on b
         # should be a funcition for log probs
         logits_loss = torch.sum(bernoulli.log_prob(b), 0)
-        
         #outer product, sum
         output = torch.einsum('mn, bmf->bnf', w, x)# need to be all the same type
-
         return output, extra_loss + logits_loss
 
 # Task Head for each task
@@ -139,20 +130,23 @@ class MixtureOfExperts(nn.Module):
     def forward(self, x):
         """
         :param x: tensor containing a batch of images / states / observations / etc.
-        :param task: tensor containing a task number
         """
+        
         # makes sure experts are batched and have correct number of input dimentions
         if self.expert_type == 0 and len(x.shape) > 3: # Images
             raise ValueError("Expecting batched images, got {}".format(x.shape))
-        if self.expert_type == 1 and len(x.shape) > 2: # Vectors
-            raise ValueError("Expecting batched vectors, got {}".format(x.shape))
-        
+        if self.expert_type == 1:
+            if len(x.shape) == 1:
+                x = x[None]
+            if len(x.shape) > 2: # Vectors
+                raise ValueError("Expecting batched vectors, got {}".format(x.shape))
+
         B = x.shape[0] # batch size
         
         # in: B x width x height
         # out: B x M x F
         expert_output = torch.stack([self.experts[i](x) for i in range(M)], dim = 1)
-        
+
         # in: B x M x F
         # out: B x N x F
         self.cumulative_logits_loss = torch.zeros(N)
