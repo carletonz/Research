@@ -66,7 +66,7 @@ class Gating(nn.Module):
         self.weights = nn.Parameter(torch.zeros([M, N]))
         self.logits = nn.Parameter(torch.zeros([M, N]))
         #self.mapping = torch.eye(N)
-        self.mapping = torch.tensor([[1.0],[0.0]])
+        #self.mapping = torch.tensor([[1.0],[0.0]])
     
     def forward(self, x, extra_loss):
         """
@@ -76,8 +76,8 @@ class Gating(nn.Module):
         """
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
             
-        b = self.mapping#bernoulli.sample()
-        w = b#self.weights * b
+        b = bernoulli.sample()
+        w = self.weights * b
         # depeds on b
         # should be a funcition for log probs
         logits_loss = torch.sum(bernoulli.log_prob(b), 0)
