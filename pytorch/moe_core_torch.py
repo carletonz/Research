@@ -11,7 +11,7 @@ import torch.optim as optim
 
 M = 2 # Number of experts
 N = 2 # Number of tasks
-CONNECTION_SIZE = 25 # output size of expert and input size of task head
+CONNECTION_SIZE = 256 # output size of expert and input size of task head
 
 # expert where inputs are color images
 # (f)
@@ -47,9 +47,9 @@ class Expert_conv(nn.Module):
 class Expert_linear(nn.Module):
     def __init__(self, input_size):
         super(Expert_linear, self).__init__()
-        self.hl1 = nn.Linear(input_size, 220)
-        self.hl2 = nn.Linear(220, 200)
-        self.hl3 = nn.Linear(200, CONNECTION_SIZE)
+        self.hl1 = nn.Linear(input_size, 256)
+        self.hl2 = nn.Linear(256, 256)
+        self.hl3 = nn.Linear(256, CONNECTION_SIZE)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))
@@ -65,7 +65,7 @@ class Gating(nn.Module):
         super(Gating, self).__init__()
         self.weights = nn.Parameter(torch.zeros([M, N]))
         self.logits = nn.Parameter(torch.zeros([M, N]))
-        #self.mapping = torch.eye(N)
+        self.mapping = torch.eye(N)
         #self.mapping = torch.tensor([[1.0],[0.0]])
     
     def forward(self, x, extra_loss):
@@ -76,8 +76,8 @@ class Gating(nn.Module):
         """
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
             
-        b = bernoulli.sample()
-        w = self.weights * b
+        b = self.mapping #bernoulli.sample()
+        w = b#self.weights * b
         # depeds on b
         # should be a funcition for log probs
         logits_loss = torch.sum(bernoulli.log_prob(b), 0)
@@ -91,9 +91,9 @@ class Gating(nn.Module):
 class Task(nn.Module):
     def __init__(self, task_output_size):
         super(Task, self).__init__()
-        self.hl1 = nn.Linear(CONNECTION_SIZE, 220)
-        self.hl2 = nn.Linear(220, 200)
-        self.hl3 = nn.Linear(200, task_output_size)
+        self.hl1 = nn.Linear(CONNECTION_SIZE, 128)
+        self.hl2 = nn.Linear(128, 64)
+        self.hl3 = nn.Linear(64, task_output_size)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))
