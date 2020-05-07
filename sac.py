@@ -47,7 +47,7 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
         update_after=1000, update_every=50, num_test_episodes=10, max_ep_len=1000, 
-        logger_kwargs=dict(), save_freq=1, baseline=False):
+        logger_kwargs=dict(), save_freq=1, baseline=False, save_gating=False):
     """
     Soft Actor-Critic (SAC)
 
@@ -273,6 +273,8 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
                       deterministic)
 
     def test_agent():
+        if save_gating:
+            ac.pi.net.gates.save_stats(logger_kwargs["output_dir"])
         for j in range(num_test_episodes):
             o, d, ep_ret, ep_len, info = test_env.reset(), False, 0, 0, np.zeros(len(test_env))
             while not(d or (ep_len == max_ep_len)):

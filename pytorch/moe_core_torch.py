@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import numpy as np
+import os
 
 M = 2 # Number of experts
 N = 2 # Number of tasks
@@ -65,7 +67,11 @@ class Gating(nn.Module):
         super(Gating, self).__init__()
         self.weights = nn.Parameter(torch.zeros([M, N]))
         self.logits = nn.Parameter(torch.zeros([M, N]))
-        self.mapping = torch.eye(N)
+
+        self.prob = torch.zeros([M,N])
+        self.save_index = 0
+
+        #self.mapping = torch.eye(N)
         #self.mapping = torch.tensor([[1.0],[0.0]])
     
     def forward(self, x, extra_loss):
@@ -76,14 +82,25 @@ class Gating(nn.Module):
         """
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
             
-        b = self.mapping #bernoulli.sample()
-        w = b#self.weights * b
+        b = bernoulli.sample()
+        w = self.weights * b
         # depeds on b
+        self.prob = bernoulli.probs
         # should be a funcition for log probs
         logits_loss = torch.sum(bernoulli.log_prob(b), 0)
         #outer product, sum
         output = torch.einsum('mn, bmf->bnf', w, x)# need to be all the same type
         return output, extra_loss + logits_loss
+
+    def save_stats(self, output_dir):
+        if not os.path.isdir(output_dir+"/weights"):
+            os.makedirs(output_dir+"/weights")
+        if not os.path.isdir(output_dir+"/probs"):
+            os.makedirs(output_dir+"/probs")
+        np.save(output_dir+"/weights/weights"+str(self.save_index), self.weights.detach().numpy())
+        np.save(output_dir+"/probs/probs"+str(self.save_index), self.prob.detach().numpy())
+        self.save_index += 1
+
 
 # Task Head for each task
 # 'a' is the size of the output space for each task

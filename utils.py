@@ -30,9 +30,9 @@ class EnvSet(gym.Env):
         env_state = [self.envs[i].step(a[i]) for i in range(len(self.envs))]
 
         obs = np.concatenate([env_state[i][0] for i in range(len(env_state))])
-        reward = np.array([env_state[i][1]*self.reward_weights[i] for i in range(len(env_state))]).sum()
+        reward = np.array([env_state[i][1] for i in range(len(env_state))]).sum()
         done = np.all([env_state[i][2] for i in range(len(env_state))])
-        info = np.array([env_state[i][1]*self.reward_weights[i] for i in range(len(env_state))])
+        info = np.array([env_state[i][1] for i in range(len(env_state))])
         
         return obs, reward, done, info
     
