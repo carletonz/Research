@@ -7,6 +7,8 @@ import torch.nn.functional as F
 from torch.distributions.normal import Normal
 from pytorch import moe_core_torch
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 def combined_shape(length, shape=None):
     if shape is None:
         return (length,)
@@ -39,6 +41,7 @@ class SquashedGaussianMLPActor(nn.Module):
         self.act_limit = act_limit
 
     def forward(self, obs, deterministic=False, with_logprob=True):
+        obs = obs.to(device)
         net_out = self.net(obs)
         mu = self.mu_layer(net_out)
         log_std = self.log_std_layer(net_out)
@@ -77,6 +80,8 @@ class MLPQFunction(nn.Module):
         self.q = mlp([obs_dim + act_dim] + list(hidden_sizes) + [1], activation)
 
     def forward(self, obs, act):
+        obs = obs.to(device)
+        act = act.to(device)
         q = self.q(torch.cat([obs, act], dim=-1))
         return torch.squeeze(q, -1) # Critical to ensure q has right shape.
 
@@ -89,17 +94,15 @@ class MLPActorCritic(nn.Module):
         obs_dim = observation_space.shape[0]
         act_dim = action_space.shape[0]
         act_limit = action_space.high[0]
-
+        
         # build policy and value functions
         self.pi = SquashedGaussianMLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit, env)
-        
-        print(obs_dim)
-        print(act_dim)
 
         self.q1 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
         self.q2 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
 
     def act(self, obs, deterministic=False):
+        obs = obs.to(device)
         with torch.no_grad():
             a, _ = self.pi(obs, deterministic, False)
-            return a.numpy()
+            return a.cpu().numpy()

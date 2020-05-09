@@ -10,8 +10,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import os
-
-M = 2 # Number of experts
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+M = 10 # Number of experts
 N = 2 # Number of tasks
 CONNECTION_SIZE = 256 # output size of expert and input size of task head
 
@@ -81,7 +81,7 @@ class Gating(nn.Module):
         :return B x N x F : 
         """
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
-            
+        
         b = bernoulli.sample()
         w = self.weights * b
         # depeds on b
@@ -97,8 +97,8 @@ class Gating(nn.Module):
             os.makedirs(output_dir+"/weights")
         if not os.path.isdir(output_dir+"/probs"):
             os.makedirs(output_dir+"/probs")
-        np.save(output_dir+"/weights/weights"+str(self.save_index), self.weights.detach().numpy())
-        np.save(output_dir+"/probs/probs"+str(self.save_index), self.prob.detach().numpy())
+        np.save(output_dir+"/weights/weights"+str(self.save_index), self.weights.detach().cpu().numpy())
+        np.save(output_dir+"/probs/probs"+str(self.save_index), self.prob.detach().cpu().numpy())
         self.save_index += 1
 
 
@@ -166,7 +166,7 @@ class MixtureOfExperts(nn.Module):
 
         # in: B x M x F
         # out: B x N x F
-        self.cumulative_logits_loss = torch.zeros(N)
+        self.cumulative_logits_loss = torch.zeros(N).to(device)
         gates_output, self.cumulative_logits_loss = self.gates(expert_output, self.cumulative_logits_loss)
         
         # in: B x N x F
