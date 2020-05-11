@@ -27,7 +27,7 @@ def run():
 def test():
     res_id = 1589052677
     result_path = "/home/ubuntu/Documents/proj/research/Research/results/moe-"
-    video_path = [result_path+str(res_id)+"/videoEnv0/",None]
+    video_path = [None,result_path+str(res_id)+"/videoEnv1/"]
     model_path = result_path+str(res_id)+"/pyt_save/model.pt"
     run_model(create_env, model_path, video_path)
 
