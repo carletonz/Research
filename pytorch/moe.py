@@ -13,7 +13,7 @@ def create_cheetah_env():
     return gym.make("HalfCheetah-v2")
 
 def create_env(video_path = None):
-    return EnvDecomposed(create_cheetah_env, [3,3], np.arange(6))
+    return EnvSet([create_ant_env,create_cheetah_env], video_path)
 
 def run():
     sac.sac(create_env, 
@@ -25,10 +25,10 @@ def run():
             save_gating=True)
 
 def test():
-    res_id = 1589012680
+    res_id = 1589052677
     result_path = "/home/ubuntu/Documents/proj/research/Research/results/moe-"
     video_path = [result_path+str(res_id)+"/videoEnv0/",None]
     model_path = result_path+str(res_id)+"/pyt_save/model.pt"
     run_model(create_env, model_path, video_path)
 
-run()
+test()
