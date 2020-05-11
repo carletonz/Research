@@ -130,6 +130,7 @@ class MixtureOfExperts(nn.Module):
             ])
             self.expert_type = 0
         elif input_type == "V": # vector
+            print(input_size)
             self.experts = nn.ModuleList([
                 Expert_linear(input_size) for i in range(M)
             ])
