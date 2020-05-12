@@ -12,7 +12,7 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 M = 2 # Number of experts
-N = 1 # Number of tasks
+N = 2 # Number of tasks
 CONNECTION_SIZE = 256 # output size of expert and input size of task head
 
 # expert where inputs are color images
@@ -139,6 +139,7 @@ class MixtureOfExperts(nn.Module):
             raise ValueError()
         
         self.gates = Gating()
+        N = len(task_output_size)
         self.taskHeads = nn.ModuleList([
                 Task(task_output_size[i]) for i in range(N)
             ])
