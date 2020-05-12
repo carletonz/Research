@@ -13,14 +13,14 @@ def create_cheetah_env():
     return gym.make("HalfCheetah-v2")
 
 def create_env(video_path = None):
-    return EnvSet([create_ant_env, create_cheetah_env], video_path)
+    return EnvDecomposed(create_cheetah_env, [1,1,1,1,1,1], np.arange(6))
 
 def run():
     sac.sac(create_env, 
             MLPActorCritic, 
             epochs=200, 
             steps_per_epoch=4000, 
-            ac_kwargs={"hidden_sizes":(256, 256, 14)}, 
+            ac_kwargs={"hidden_sizes":(256, 256, 6)}, 
             logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-%i"%int(time.time())},
             save_gating=True)
 
