@@ -31,4 +31,4 @@ def test():
     model_path = result_path+str(res_id)+"/pyt_save/model.pt"
     run_model(create_env, model_path, video_path)
 
-test()
+run()

@@ -67,7 +67,8 @@ class Expert_linear(nn.Module):
 class Gating(nn.Module):
     def __init__(self):
         super(Gating, self).__init__()
-        self.weights = nn.Parameter(torch.zeros([M, N]))
+        #self.weights = nn.Parameter(torch.zeros([M, N]))
+        self.weights = nn.Parameter(torch.rand([M, N]))
         self.logits = nn.Parameter(torch.zeros([M, N]))
 
         self.prob = torch.zeros([M,N])
@@ -83,15 +84,15 @@ class Gating(nn.Module):
         :return B x N x F : 
         """
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
-        
-        b = bernoulli.sample()
+
+        b = torch.stack([bernoulli.sample() for i in range(x.shape[0])], dim=0)
         w = self.weights * b
         # depeds on b
         self.prob = bernoulli.probs
         # should be a funcition for log probs
         logits_loss = torch.sum(bernoulli.log_prob(b), 0)
         #outer product, sum
-        output = torch.einsum('mn, bmf->bnf', w, x)# need to be all the same type
+        output = torch.einsum('bmn, bmf->bnf', w, x)# need to be all the same type
         return output, extra_loss + logits_loss
 
     def save_stats(self, output_dir):
@@ -167,7 +168,7 @@ class MixtureOfExperts(nn.Module):
         # in: B x width x height
         # out: B x M x F
         expert_output = torch.stack([self.experts[i](x) for i in range(M)], dim = 1)
-
+        
         # in: B x M x F
         # out: B x N x F
         self.cumulative_logits_loss = torch.zeros(N).to(device)
@@ -177,8 +178,7 @@ class MixtureOfExperts(nn.Module):
         # out: B x O
         # O is the sum of all task output sizes
         # cancatinate this so all task outputs are in the same dimention
-        taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i]) for i in range(N)], dim=1)
-        
+        taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i])*(0 if i == 1 else 1) for i in range(N)], dim=1)
         # remove batch dimention if there is only one observation being processed
         if taskHead_output.shape[0] == 1:
             taskHead_output = taskHead_output[0]
@@ -192,25 +192,8 @@ class MixtureOfExperts(nn.Module):
 
 
 if __name__ == "__main__":
-    input_type = "V"
-    task_output_size = list(range(N))
-    input_size = 20
-    batches = 50
-    output_size = int(sum(task_output_size))
-    
-    moe = MixtureOfExperts(input_size, task_output_size, input_type)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(moe.parameters(), lr=0.001, momentum=0.9)
-    
-    for i in range(5):
-        inputs = torch.randn(batches, input_size)
-        label = torch.randint(0, output_size, (batches,))
+    moe = MixtureOfExperts(10, [4,5])
+    i = torch.randn(10, dtype=torch.float)
+    print(moe(i))
 
-        output = moe(inputs)
-        #output, action = torch.max(output, 0)
-        optimizer.zero_grad()
-        loss = criterion(output, label)
-        loss = moe.get_loss(loss)
-        print(loss)
-        loss.backward()
-        optimizer.step()
+
