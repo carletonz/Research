@@ -26,7 +26,7 @@ class EnvSet(gym.Env):
         self.action_space = spaces.Box(action_space_low, action_space_high)
         self.observation_space = spaces.Box(obs_space_low, obs_space_high)
         
-        self.reward_weights = np.array([1.0, 0.0])
+        self.reward_weights = np.array([1.0, 1.0])
 
     def step(self, action):
         # List of actions separated by environment
@@ -34,20 +34,14 @@ class EnvSet(gym.Env):
         #List of observation, reward, done, info tuple for each environment
         env_state = [self.envs[i].step(a[i]) for i in range(len(self.envs))]
 
-        obs = np.zeros(self.observation_space.shape)
-        obs[:self.envs[0].observation_space.shape[0]] = env_state[0][0]*self.reward_weights[0]
-        #obs = np.concatenate([env_state[i][0] for i in range(len(env_state))])
+        obs = np.concatenate([env_state[i][0] for i in range(len(env_state))])
         reward = np.array([env_state[i][1]*self.reward_weights[i] for i in range(len(env_state))]).sum()
         done = np.all([env_state[i][2] for i in range(len(env_state))])
         info = np.array([env_state[i][1]*self.reward_weights[i] for i in range(len(env_state))])
         return obs, reward, done, info
     
     def reset(self):
-        obs = np.zeros(self.observation_space.shape)
-        obs[:self.envs[0].observation_space.shape[0]] = self.envs[0].reset()
-        self.envs[1].reset()
-        return obs
-        #return np.concatenate([env.reset() for env in self.envs])
+        return np.concatenate([env.reset() for env in self.envs])
 
     def render(self):
         for env in self.envs:

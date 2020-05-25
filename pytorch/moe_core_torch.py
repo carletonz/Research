@@ -178,7 +178,7 @@ class MixtureOfExperts(nn.Module):
         # out: B x O
         # O is the sum of all task output sizes
         # cancatinate this so all task outputs are in the same dimention
-        taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i])*(0 if i == 1 else 1) for i in range(N)], dim=1)
+        taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i]) for i in range(N)], dim=1)
         # remove batch dimention if there is only one observation being processed
         if taskHead_output.shape[0] == 1:
             taskHead_output = taskHead_output[0]
