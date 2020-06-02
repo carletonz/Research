@@ -217,14 +217,16 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
         q_pi = torch.min(q1_pi, q2_pi)
 
         # Entropy-regularized policy loss
-        loss_pi = (alpha * logp_pi - q_pi).mean()
-
-        # Useful info for logging
-        pi_info = dict(LogPi=logp_pi.detach().cpu().numpy())
+        loss_pi = (alpha * logp_pi - q_pi)
         
         # MOE has a custom loss function
         if callable(getattr(ac.pi.net, "get_loss", None)):
             loss_pi = ac.pi.net.get_loss(loss_pi)
+        else:
+            loss_pi = loss_pi.mean()
+
+        # Useful info for logging
+        pi_info = dict(LogPi=logp_pi.detach().cpu().numpy())
 
         return loss_pi, pi_info
 

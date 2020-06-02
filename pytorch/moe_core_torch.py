@@ -12,10 +12,10 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 2 # Number of experts
+M = 3 # Number of experts
 N = 2 # Number of tasks
-
 CONNECTION_SIZE = 256 # output size of expert and input size of task head
+GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
 
 # expert where inputs are color images
 # (f)
@@ -67,8 +67,8 @@ class Expert_linear(nn.Module):
 class Gating(nn.Module):
     def __init__(self):
         super(Gating, self).__init__()
-        #self.weights = nn.Parameter(torch.zeros([M, N]))
-        self.weights = nn.Parameter(torch.rand([M, N]))
+        self.weights = nn.Parameter(torch.zeros([M, N]))
+        
         self.logits = nn.Parameter(torch.zeros([M, N]))
 
         self.prob = torch.zeros([M,N])
@@ -85,15 +85,28 @@ class Gating(nn.Module):
         """
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
 
-        b = torch.stack([bernoulli.sample() for i in range(x.shape[0])], dim=0)
+        b = bernoulli.sample(torch.Size([x.shape[0]]))
         w = self.weights * b
         # depeds on b
         self.prob = bernoulli.probs
         # should be a funcition for log probs
-        logits_loss = torch.sum(bernoulli.log_prob(b), 0)
+        logits_loss = self.get_logits_loss(bernoulli, b)
         #outer product, sum
         output = torch.einsum('bmn, bmf->bnf', w, x)# need to be all the same type
+
         return output, extra_loss + logits_loss
+
+    def get_logits_loss(self, distribution, b):
+        if GE_FUNCTION == "sf":
+            return self._logits_loss_sf(distribution, b)
+        elif GE_FUNCTION == "mv":
+            return self._logits_loss_mv(distribution, b)
+
+    def _logits_loss_sf(self, distribution, b):
+        return torch.sum(distribution.log_prob(b), 1)
+
+    def _logits_loss_mv(self, distribution, b):
+        raise NotImplementedError
 
     def save_stats(self, output_dir):
         if not os.path.isdir(output_dir+"/weights"):
@@ -133,7 +146,6 @@ class MixtureOfExperts(nn.Module):
             ])
             self.expert_type = 0
         elif input_type == "V": # vector
-            print(input_size)
             self.experts = nn.ModuleList([
                 Expert_linear(input_size) for i in range(M)
             ])
@@ -171,7 +183,7 @@ class MixtureOfExperts(nn.Module):
         
         # in: B x M x F
         # out: B x N x F
-        self.cumulative_logits_loss = torch.zeros(N).to(device)
+        self.cumulative_logits_loss = torch.zeros(B, N).to(device)
         gates_output, self.cumulative_logits_loss = self.gates(expert_output, self.cumulative_logits_loss)
         
         # in: B x N x F
@@ -186,10 +198,18 @@ class MixtureOfExperts(nn.Module):
         return taskHead_output
     
     def get_loss(self, loss):
-        logits_loss = self.cumulative_logits_loss * loss.detach()
+        if GE_FUNCTION == "sf":
+            return self._get_loss_sf(loss)
+        elif GE_FUNCTION == "mv":
+            return self._get_loss_mv(loss)
+    
+    def _get_loss_sf(self, loss):# score function gradient estimator
+        logits_loss = self.cumulative_logits_loss.sum(dim=1)*loss.detach()
         total_loss = logits_loss + loss
-        return total_loss.sum()
+        return total_loss.mean()
 
+    def _get_loss_mv(self, loss):# measure-valued gradient estimator
+        raise NotImplementedError
 
 if __name__ == "__main__":
     moe = MixtureOfExperts(10, [4,5])

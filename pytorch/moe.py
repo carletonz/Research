@@ -21,14 +21,14 @@ def run():
             epochs=200, 
             steps_per_epoch=4000, 
             ac_kwargs={"hidden_sizes":(256, 256, 16)}, 
-            logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-%i"%int(time.time())},
+            logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-ant-only-%i"%int(time.time())},
             save_gating=True)
 
 def test():
-    res_id = 1589358900
-    result_path = "/home/ubuntu/Documents/proj/research/Research/results/moe-"
+    res_id = 1591049489
+    result_path = "/home/ubuntu/Documents/proj/research/Research/results/moe-ant-only-"
     video_path = [result_path+str(res_id)+"/videoEnv0/", None]
     model_path = result_path+str(res_id)+"/pyt_save/model.pt"
     run_model(create_env, model_path, video_path)
 
-run()
+test()
