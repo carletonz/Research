@@ -12,7 +12,7 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 3 # Number of experts
+M = 2 # Number of experts
 N = 2 # Number of tasks
 CONNECTION_SIZE = 256 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
@@ -106,7 +106,7 @@ class Gating(nn.Module):
         return torch.sum(distribution.log_prob(b), 1)
 
     def _logits_loss_mv(self, distribution, b):
-        raise NotImplementedError
+        pass
 
     def save_stats(self, output_dir):
         if not os.path.isdir(output_dir+"/weights"):
@@ -165,13 +165,14 @@ class MixtureOfExperts(nn.Module):
         """
         :param x: tensor containing a batch of images / states / observations / etc.
         """
-        
+        batched = True
         # makes sure experts are batched and have correct number of input dimentions
         if self.expert_type == 0 and len(x.shape) > 3: # Images
             raise ValueError("Expecting batched images, got {}".format(x.shape))
         if self.expert_type == 1:
             if len(x.shape) == 1:
                 x = x[None]
+                batched = False
             if len(x.shape) > 2: # Vectors
                 raise ValueError("Expecting batched vectors, got {}".format(x.shape))
 
@@ -190,12 +191,9 @@ class MixtureOfExperts(nn.Module):
         # out: B x O
         # O is the sum of all task output sizes
         # cancatinate this so all task outputs are in the same dimention
-        taskHead_output = torch.cat([self.taskHeads[i](gates_output[:,i]) for i in range(N)], dim=1)
-        # remove batch dimention if there is only one observation being processed
-        if taskHead_output.shape[0] == 1:
-            taskHead_output = taskHead_output[0]
+        taskHead_output = [self.taskHeads[i](gates_output[:,i])* (0 if i == 1 else 1) for i in range(N)]
 
-        return taskHead_output
+        return taskHead_output, batched
     
     def get_loss(self, loss):
         if GE_FUNCTION == "sf":
@@ -204,12 +202,12 @@ class MixtureOfExperts(nn.Module):
             return self._get_loss_mv(loss)
     
     def _get_loss_sf(self, loss):# score function gradient estimator
-        logits_loss = self.cumulative_logits_loss.sum(dim=1)*loss.detach()
+        logits_loss = self.cumulative_logits_loss*loss.detach()
         total_loss = logits_loss + loss
         return total_loss.mean()
 
     def _get_loss_mv(self, loss):# measure-valued gradient estimator
-        raise NotImplementedError
+        pass
 
 if __name__ == "__main__":
     moe = MixtureOfExperts(10, [4,5])

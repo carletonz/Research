@@ -190,12 +190,14 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
         with torch.no_grad():
             # Target actions come from *current* policy
             a2, logp_a2 = ac.pi(o2)
+            #print((q_pi_targ - alpha*logp_a2).shape)
 
             # Target Q-values
             q1_pi_targ = ac_targ.q1(o2, a2)
             q2_pi_targ = ac_targ.q2(o2, a2)
             q_pi_targ = torch.min(q1_pi_targ, q2_pi_targ)
-            backup = r + gamma * (1 - d) * (q_pi_targ - alpha * logp_a2)
+
+            backup = r.view((-1,1)) + gamma * (1 - d).view((-1,1)) * (q_pi_targ - alpha * logp_a2)
 
         # MSE loss against Bellman backup
         loss_q1 = ((q1 - backup)**2).mean()

@@ -25,25 +25,49 @@ def count_vars(module):
     return sum([np.prod(p.shape) for p in module.parameters()])
 
 
+class MOEConnector(nn.Module):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, act_limit, env):
+        super().__init__()
+        print(env.obs_splits, env.action_sizes)
+        self.net = moe_core_torch.MixtureOfExperts(env.obs_splits, env.action_sizes)
+        self.pis = [SquashedGaussianMLPActor(env.obs_sizes[i], env.action_sizes[i], [env.action_sizes[i]], activation, act_limit) for i in range(len(env))]
+
+    def forward(self, obs, deterministic=False, with_logprob=True):
+        net_out, batched = self.net(obs)
+        actor_out = [self.pis[i](net_out[i], deterministic, with_logprob) for i in range(len(self.pis))]
+        action = torch.cat([actor_out[i][0] for i in range(len(self.pis))], dim=1)
+        if with_logprob:
+            logp_pi = torch.stack([actor_out[i][1] for i in range(len(self.pis))], dim=1)
+        else:
+            logp_pi = None
+
+        if not batched:
+            action = action[0]
+            if logp_pi != None:
+                print(logp_pi)
+                raise "error"
+
+        return action, logp_pi
+
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
 
 class SquashedGaussianMLPActor(nn.Module):
 
-    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, act_limit, env):
+    def __init__(self, obs_dim, act_dim, hidden_sizes, activation, act_limit):
         super().__init__()
-        if env != None:
-            self.net = moe_core_torch.MixtureOfExperts(env.obs_splits, env.action_sizes)
-        else:
-            self.net = mlp([obs_dim] + list(hidden_sizes), activation, activation)
+        #if env != None:
+        #    self.net = moe_core_torch.MixtureOfExperts(env.obs_splits, env.action_sizes)
+        #else:
+        #    self.net = mlp([obs_dim] + list(hidden_sizes), activation, activation)
         self.mu_layer = nn.Linear(hidden_sizes[-1], act_dim)
         self.log_std_layer = nn.Linear(hidden_sizes[-1], act_dim)
         self.act_limit = act_limit
 
     def forward(self, obs, deterministic=False, with_logprob=True):
         obs = obs.to(device)
-        net_out = self.net(obs)
-        mu = self.mu_layer(net_out)
+        net_out = obs
+        mu = net_out#self.mu_layer(net_out)
         log_std = self.log_std_layer(net_out)
         log_std = torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
         std = torch.exp(log_std)
@@ -64,6 +88,9 @@ class SquashedGaussianMLPActor(nn.Module):
             # Try deriving it yourself as a (very difficult) exercise. :)
             logp_pi = pi_distribution.log_prob(pi_action).sum(axis=-1)
             logp_pi -= (2*(np.log(2) - pi_action - F.softplus(-2*pi_action))).sum(axis=1)
+            #logp_pi = logp_pi.split(self.act_sizes, dim=1)
+            #logp_pi = torch.stack([x.sum(dim=-1) for x in logp_pi], dim=1)
+
         else:
             logp_pi = None
 
@@ -77,7 +104,8 @@ class MLPQFunction(nn.Module):
 
     def __init__(self, obs_dim, act_dim, hidden_sizes, activation):
         super().__init__()
-        self.q = mlp([obs_dim + act_dim] + list(hidden_sizes) + [1], activation)
+        self.q = mlp([obs_dim + act_dim] + list(hidden_sizes) + [moe_core_torch.N], activation)
+
 
     def forward(self, obs, act):
         obs = obs.to(device)
@@ -96,7 +124,8 @@ class MLPActorCritic(nn.Module):
         act_limit = action_space.high[0]
         
         # build policy and value functions
-        self.pi = SquashedGaussianMLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit, env)
+        self.pi = MOEConnector(obs_dim, act_dim, hidden_sizes, activation, act_limit, env)
+        #SquashedGaussianMLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit, env)
 
         self.q1 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)
         self.q2 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation)

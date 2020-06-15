@@ -21,8 +21,10 @@ class EnvSet(gym.Env):
         
         obs_space_low = np.concatenate([e.observation_space.low for e in self.envs])
         obs_space_high = np.concatenate([e.observation_space.high for e in self.envs])
-        self.obs_splits = np.concatenate([e.observation_space.shape for e in self.envs]).sum()
         
+        self.obs_sizes = np.concatenate([e.observation_space.shape for e in self.envs])
+        self.obs_splits = self.obs_sizes.sum()
+
         self.action_space = spaces.Box(action_space_low, action_space_high)
         self.observation_space = spaces.Box(obs_space_low, obs_space_high)
         
@@ -133,3 +135,25 @@ def run_model(env_fn, model_path, video_path = None, ):
         print(f"Min return    : {np.min(individual_returns[i])}")
         print(f"Max return    : {np.max(individual_returns[i])}")
     env.close()
+
+
+class NullEnv(gym.Env):
+    def __init__(self, env_fn):
+        self.env = env_fn()
+        self.action_space = self.env.action_space
+        self.observation_space = self.env.observation_space
+
+    def step(self, action):
+        return torch.zeros(self.observation_space.shape), 0, False, 0
+
+    def reset(self):
+        return torch.zeros(self.observation_space.shape)
+
+    def render(self):
+        self.env.render()
+
+    def close(self):
+        self.env.close()
+
+    def seed(self):
+        pass
