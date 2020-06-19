@@ -18,7 +18,7 @@ def create_null_env(env_fn):
     return create_env
 
 def create_env(video_path = None):
-    return EnvSet([create_ant_env],video_path)
+    return EnvSet([create_ant_env, create_null_env(create_cheetah_env)],video_path)
 
 def run():
     sac.sac(create_env, 
