@@ -28,7 +28,7 @@ class EnvSet(gym.Env):
         self.action_space = spaces.Box(action_space_low, action_space_high)
         self.observation_space = spaces.Box(obs_space_low, obs_space_high)
         
-        self.reward_weights = np.array([1.0, 1.0])
+        self.reward_weights = np.array([1.0])
 
     def step(self, action):
         # List of actions separated by environment

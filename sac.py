@@ -217,7 +217,6 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
         q1_pi = ac.q1(o, pi)
         q2_pi = ac.q2(o, pi)
         q_pi = torch.min(q1_pi, q2_pi)
-
         # Entropy-regularized policy loss
         loss_pi = (alpha * logp_pi - q_pi)
         
@@ -240,6 +239,7 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
     logger.setup_pytorch_saver(ac)
 
     def update(data):
+        #print("start updating ...")
         # First run one gradient descent step for Q1 and Q2
         q_optimizer.zero_grad()
         loss_q, q_info = compute_loss_q(data)
@@ -274,6 +274,8 @@ def sac(env_fn, actor_critic=core2.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 # params, as opposed to "mul" and "add", which would make new tensors.
                 p_targ.data.mul_(polyak)
                 p_targ.data.add_((1 - polyak) * p.data)
+        #print("finish updating")
+        #raise "error"
 
     def get_action(o, deterministic=False):
         return ac.act(torch.as_tensor(o, dtype=torch.float32).to(device), 

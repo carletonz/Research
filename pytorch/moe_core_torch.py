@@ -13,7 +13,7 @@ import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 M = 2 # Number of experts
-N = 2 # Number of tasks
+N = 1 # Number of tasks
 CONNECTION_SIZE = 256 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
 
@@ -107,6 +107,9 @@ class Gating(nn.Module):
 
     def _logits_loss_mv(self, distribution, b):
         pass
+        #uniform = torch.distributions.unifrom.Uniform(torch.tensor([0]), torch.tensor([1]))
+        #b_uniform = (uniform.sample(b.shape) > .5).to(torch.float)
+        #loss = (2**(k))*((-1)**(1-b))*(1-distribution.log_prob(b))*distribution.log_prob(b_uniform))
 
     def save_stats(self, output_dir):
         if not os.path.isdir(output_dir+"/weights"):
@@ -191,7 +194,7 @@ class MixtureOfExperts(nn.Module):
         # out: B x O
         # O is the sum of all task output sizes
         # cancatinate this so all task outputs are in the same dimention
-        taskHead_output = [self.taskHeads[i](gates_output[:,i])* (0 if i == 1 else 1) for i in range(N)]
+        taskHead_output = [self.taskHeads[i](gates_output[:,i]) for i in range(N)]
 
         return taskHead_output, batched
     

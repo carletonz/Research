@@ -35,8 +35,11 @@ class MOEConnector(nn.Module):
     def forward(self, obs, deterministic=False, with_logprob=True):
         net_out, batched = self.net(obs)
         actor_out = [self.pis[i](net_out[i], deterministic, with_logprob) for i in range(len(self.pis))]
+        
+        #actor_out[1][0].detach_()
         action = torch.cat([actor_out[i][0] for i in range(len(self.pis))], dim=1)
         if with_logprob:
+            #actor_out[1][1].detach_()
             logp_pi = torch.stack([actor_out[i][1] for i in range(len(self.pis))], dim=1)
         else:
             logp_pi = None
@@ -46,8 +49,8 @@ class MOEConnector(nn.Module):
             if logp_pi != None:
                 print(logp_pi)
                 raise "error"
-
         return action, logp_pi
+
 
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
@@ -67,7 +70,7 @@ class SquashedGaussianMLPActor(nn.Module):
     def forward(self, obs, deterministic=False, with_logprob=True):
         obs = obs.to(device)
         net_out = obs
-        mu = net_out#self.mu_layer(net_out)
+        mu = self.mu_layer(net_out)
         log_std = self.log_std_layer(net_out)
         log_std = torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
         std = torch.exp(log_std)
@@ -111,7 +114,7 @@ class MLPQFunction(nn.Module):
         obs = obs.to(device)
         act = act.to(device)
         q = self.q(torch.cat([obs, act], dim=-1))
-        return torch.squeeze(q, -1) # Critical to ensure q has right shape.
+        return q#torch.squeeze(q, -1) # Critical to ensure q has right shape.
 
 class MLPActorCritic(nn.Module):
 
