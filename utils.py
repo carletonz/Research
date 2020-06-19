@@ -28,7 +28,7 @@ class EnvSet(gym.Env):
         self.action_space = spaces.Box(action_space_low, action_space_high)
         self.observation_space = spaces.Box(obs_space_low, obs_space_high)
         
-        self.reward_weights = np.array([1.0, 0.0])
+        self.reward_weights = np.array([1.0, 1.0])
 
     def step(self, action):
         # List of actions separated by environment
@@ -157,3 +157,12 @@ class NullEnv(gym.Env):
 
     def seed(self):
         pass
+
+
+def get_model(model_path):
+    def load_model(observation_space, action_space, hidden_sizes=(256,256), activation=None, env=None):
+        model = torch.load(model_path)
+        return model
+    return load_model
+
+
