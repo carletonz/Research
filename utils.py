@@ -36,10 +36,18 @@ class EnvSet(gym.Env):
         #List of observation, reward, done, info tuple for each environment
         env_state = [self.envs[i].step(a[i]) for i in range(len(self.envs))]
 
+        # attempt to scale the reward for ant to be on the same scale as cheetah
+        self.reward_weights[0] = (13500.0/5000.0)
+
         obs = np.concatenate([env_state[i][0] for i in range(len(env_state))])
-        reward = np.array([env_state[i][1]*self.reward_weights[i] for i in range(len(env_state))]).sum()
+        reward_vec = np.array([env_state[i][1]*self.reward_weights[i] for i in range(len(env_state))])
+        reward = reward_vec.sum()
         done = np.all([env_state[i][2] for i in range(len(env_state))])
-        info = np.array([env_state[i][1]*self.reward_weights[i] for i in range(len(env_state))])
+        info = np.array([env_state[i][1] for i in range(len(env_state))])
+
+        # punish for having a large difference between the weighted rewards
+        reward -= abs(reward_vec[0]-reward_vec[1])
+
         return obs, reward, done, info
     
     def reset(self):
