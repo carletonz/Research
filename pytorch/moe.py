@@ -23,14 +23,14 @@ def create_env(video_path = None):
 def run():
     sac.sac(create_env, 
             MLPActorCritic, 
-            epochs=200, 
+            epochs=400, 
             steps_per_epoch=4000, 
             ac_kwargs={"hidden_sizes":(256, 256, 8)}, 
             logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-%i"%int(time.time())},
             save_gating=True)
 
 def test():
-    res_id = 1592520193
+    res_id = "cont1592472675--1592605441"
     result_path = "/home/ubuntu/Documents/proj/research/Research/results/moe-"
     video_path = [result_path+str(res_id)+"/videoEnv0/", None]
     model_path = result_path+str(res_id)+"/pyt_save/model.pt"
@@ -51,4 +51,4 @@ def continue_training():
             save_gating=True)
 
 
-continue_training()
+run()
