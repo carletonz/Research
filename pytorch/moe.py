@@ -28,7 +28,8 @@ def run():
             ac_kwargs={"hidden_sizes":(256, 256, 8)}, 
             logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-%i"%int(time.time())},
             save_gating=True,
-            lr=1e-4)
+            lr=1e-4,
+            batch_size=200)
 
 def test():
     res_id = "cont1592472675--1592605441"
