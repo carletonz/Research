@@ -112,6 +112,10 @@ class Gating(nn.Module):
         #loss = (2**(k))*((-1)**(1-b))*(1-distribution.log_prob(b))*distribution.log_prob(b_uniform))
 
     def save_stats(self, output_dir):
+        if self.save_index % 10 != 0:
+            self.save_index += 1
+            return
+        
         if not os.path.isdir(output_dir+"/weights"):
             os.makedirs(output_dir+"/weights")
         if not os.path.isdir(output_dir+"/probs"):
