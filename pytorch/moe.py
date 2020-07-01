@@ -39,18 +39,20 @@ def test():
     run_model(create_env, model_path, video_path)
 
 def continue_training():
-    res_id = 1592472675
+    res_id = 1593297999
     result_path = "/home/ubuntu/Documents/proj/research/Research/results/moe-"
     model_path = result_path+str(res_id)+"/pyt_save/model.pt"
 
     model_fn = get_model(model_path)
     sac.sac(create_env,
             model_fn,
-            epochs=200,
+            epochs=400,
             steps_per_epoch=4000,
             ac_kwargs={"hidden_sizes":(256, 256, 8)},
             logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-cont"+str(res_id)+"--%i"%int(time.time())},
-            save_gating=True)
+            save_gating=True,
+            lr=1e-4,
+            batch_size=200)
 
 
-run()
+continue_training()
