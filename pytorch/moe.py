@@ -23,7 +23,7 @@ def create_env(video_path = None):
 def run():
     sac.sac(create_env, 
             MLPActorCritic, 
-            epochs=1600, 
+            epochs=800, 
             steps_per_epoch=4000, 
             ac_kwargs={"hidden_sizes":(256, 256, 8)}, 
             logger_kwargs={"output_dir": "/home/ubuntu/Documents/proj/research/Research/results/moe-%i"%int(time.time())},
