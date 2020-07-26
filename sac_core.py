@@ -30,10 +30,12 @@ class MOEConnector(nn.Module):
         super().__init__()
         print(env.obs_splits, env.action_sizes)
         self.net = moe_core_torch.MixtureOfExperts(env.obs_splits, env.action_sizes)
-        self.pis = [SquashedGaussianMLPActor(env.obs_sizes[i], env.action_sizes[i], [env.action_sizes[i]], activation, act_limit) for i in range(len(env))]
+        self.pis = nn.ModuleList([
+            SquashedGaussianMLPActor(env.obs_sizes[i], env.action_sizes[i], [env.action_sizes[i]], activation, act_limit) for i in range(len(env))
+            ])
 
     def forward(self, obs, deterministic=False, with_logprob=True):
-        net_out, batched = self.net(obs)
+        net_out, batched = self.net(obs.to(device))
         actor_out = [self.pis[i](net_out[i], deterministic, with_logprob) for i in range(len(self.pis))]
         
         #actor_out[1][0].detach_()
@@ -68,8 +70,7 @@ class SquashedGaussianMLPActor(nn.Module):
         self.act_limit = act_limit
 
     def forward(self, obs, deterministic=False, with_logprob=True):
-        obs = obs.to(device)
-        net_out = obs
+        net_out = obs.to(device)
         mu = self.mu_layer(net_out)
         log_std = self.log_std_layer(net_out)
         log_std = torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
