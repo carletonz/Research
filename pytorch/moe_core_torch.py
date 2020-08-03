@@ -14,7 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 M = 6 # Number of experts
 N = 2 # Number of tasks
-CONNECTION_SIZE = 128 # output size of expert and input size of task head
+CONNECTION_SIZE = 256 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
 
 # expert where inputs are color images
@@ -51,9 +51,9 @@ class Expert_conv(nn.Module):
 class Expert_linear(nn.Module):
     def __init__(self, input_size):
         super(Expert_linear, self).__init__()
-        self.hl1 = nn.Linear(input_size, 128)
-        self.hl2 = nn.Linear(128, 128)
-        self.hl3 = nn.Linear(128, CONNECTION_SIZE)
+        self.hl1 = nn.Linear(input_size, 256)
+        self.hl2 = nn.Linear(256, 256)
+        self.hl3 = nn.Linear(256, CONNECTION_SIZE)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))
