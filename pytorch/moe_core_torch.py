@@ -67,7 +67,7 @@ class Expert_linear(nn.Module):
 class Gating(nn.Module):
     def __init__(self):
         super(Gating, self).__init__()
-        self.weights = nn.Parameter(torch.zeros([M, N]))
+        #self.weights = nn.Parameter(torch.zeros([M, N]))
         
         self.logits = nn.Parameter(torch.zeros([M, N]))
 
@@ -86,7 +86,7 @@ class Gating(nn.Module):
         bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)
 
         b = bernoulli.sample(torch.Size([x.shape[0]]))
-        w = self.weights * b
+        w = b#self.weights * b
         # depeds on b
         self.prob = bernoulli.probs
         # should be a funcition for log probs
@@ -116,11 +116,11 @@ class Gating(nn.Module):
             self.save_index += 1
             return
         
-        if not os.path.isdir(output_dir+"/weights"):
-            os.makedirs(output_dir+"/weights")
+        #if not os.path.isdir(output_dir+"/weights"):
+        #os.makedirs(output_dir+"/weights")
         if not os.path.isdir(output_dir+"/probs"):
             os.makedirs(output_dir+"/probs")
-        np.save(output_dir+"/weights/weights"+str(self.save_index), self.weights.detach().cpu().numpy())
+        #np.save(output_dir+"/weights/weights"+str(self.save_index), self.weights.detach().cpu().numpy())
         np.save(output_dir+"/probs/probs"+str(self.save_index), self.prob.detach().cpu().numpy())
         self.save_index += 1
 
