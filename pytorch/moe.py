@@ -32,8 +32,8 @@ def run():
             batch_size=200)
 
 def test():
-    res_id = "cont1592472675--1592605441"
-    result_path = "/home/ubuntu/Documents/proj/research/Research/results/moe-"
+    res_id = "moe-1598559497"
+    result_path = "/home/ubuntu/Documents/proj/research/Research/results/"
     video_path = [result_path+str(res_id)+"/videoEnv0/", None]
     model_path = result_path+str(res_id)+"/pyt_save/model.pt"
     run_model(create_env, model_path, video_path)
