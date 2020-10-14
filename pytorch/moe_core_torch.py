@@ -53,12 +53,16 @@ class Expert_linear(nn.Module):
         super(Expert_linear, self).__init__()
         self.hl1 = nn.Linear(input_size, 256)
         self.hl2 = nn.Linear(256, 256)
-        self.hl3 = nn.Linear(256, CONNECTION_SIZE)
+        self.hl3 = nn.Linear(256, 256)
+        self.hl4 = nn.Linear(256, 256)
+        self.hl5 = nn.Linear(256, CONNECTION_SIZE)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))
         hl2_output = F.relu(self.hl2(hl1_output))
-        y = self.hl3(hl2_output)
+        hl3_output = F.relu(self.hl3(hl2_output))
+        hl4_output = F.relu(self.hl4(hl3_output))
+        y = self.hl5(hl4_output)
         return y
 
 # Decide to use a specific expert on a task
