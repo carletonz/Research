@@ -12,7 +12,7 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 2 # Number of experts
+M = 4 # Number of experts
 N = 2 # Number of tasks
 CONNECTION_SIZE = 256 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
@@ -73,12 +73,12 @@ class Gating(nn.Module):
         super(Gating, self).__init__()
         #self.weights = nn.Parameter(torch.zeros([M, N]))
         
-        #self.logits = nn.Parameter(torch.zeros([M, N]))
+        self.logits = nn.Parameter(torch.zeros([M, N]))
 
         self.prob = torch.zeros([M,N])
         self.save_index = 0
 
-        self.mapping = torch.eye(N)
+        #self.mapping = torch.eye(N)
         #self.mapping = torch.tensor([[1.0],[0.0]])
     
     def forward(self, x, extra_loss):
@@ -87,18 +87,18 @@ class Gating(nn.Module):
         :param extra_loss
         :return B x N x F : 
         """
-        bernoulli = torch.distributions.bernoulli.Bernoulli(probs=self.mapping)#logits=self.logits)
+        bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)#probs=self.mapping)
 
         b = bernoulli.sample(torch.Size([x.shape[0]]))
         w = b#self.weights * b
         # depeds on b
-        #self.prob = bernoulli.probs
+        self.prob = bernoulli.probs
         # should be a funcition for log probs
-        #logits_loss = self.get_logits_loss(bernoulli, b)
+        logits_loss = self.get_logits_loss(bernoulli, b)
         #outer product, sum
         output = torch.einsum('bmn, bmf->bnf', w, x)# need to be all the same type
 
-        return output, extra_loss #+ logits_loss
+        return output, extra_loss + logits_loss
 
     def get_logits_loss(self, distribution, b):
         if GE_FUNCTION == "sf":
@@ -117,17 +117,17 @@ class Gating(nn.Module):
 
     def save_stats(self, output_dir):
         return
-        #if self.save_index % 10 != 0:
-        #    self.save_index += 1
-        #    return
+        if self.save_index % 10 != 0:
+            self.save_index += 1
+            return
         
         #if not os.path.isdir(output_dir+"/weights"):
-        #os.makedirs(output_dir+"/weights")
-        #if not os.path.isdir(output_dir+"/probs"):
-        #    os.makedirs(output_dir+"/probs")
+        #    os.makedirs(output_dir+"/weights")
+        if not os.path.isdir(output_dir+"/probs"):
+            os.makedirs(output_dir+"/probs")
         #np.save(output_dir+"/weights/weights"+str(self.save_index), self.weights.detach().cpu().numpy())
-        #np.save(output_dir+"/probs/probs"+str(self.save_index), self.prob.detach().cpu().numpy())
-        #self.save_index += 1
+        np.save(output_dir+"/probs/probs"+str(self.save_index), self.prob.detach().cpu().numpy())
+        self.save_index += 1
 
 
 # Task Head for each task
@@ -214,10 +214,10 @@ class MixtureOfExperts(nn.Module):
             return self._get_loss_mv(loss)
     
     def _get_loss_sf(self, loss):# score function gradient estimator
-        return loss.mean()
-        #logits_loss = self.cumulative_logits_loss*loss.detach()
-        #total_loss = logits_loss + loss
-        #return total_loss.mean()
+        #return loss.mean()
+        logits_loss = self.cumulative_logits_loss*loss.detach()
+        total_loss = logits_loss + loss
+        return total_loss.mean()
 
     def _get_loss_mv(self, loss):# measure-valued gradient estimator
         pass
