@@ -53,16 +53,16 @@ class Expert_linear(nn.Module):
         super(Expert_linear, self).__init__()
         self.hl1 = nn.Linear(input_size, 256)
         self.hl2 = nn.Linear(256, 256)
-        self.hl3 = nn.Linear(256, 256)
-        self.hl4 = nn.Linear(256, 256)
+        #self.hl3 = nn.Linear(256, 256)
+        #self.hl4 = nn.Linear(256, 256)
         self.hl5 = nn.Linear(256, CONNECTION_SIZE)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))
         hl2_output = F.relu(self.hl2(hl1_output))
-        hl3_output = F.relu(self.hl3(hl2_output))
-        hl4_output = F.relu(self.hl4(hl3_output))
-        y = self.hl5(hl4_output)
+        #hl3_output = F.relu(self.hl3(hl2_output))
+        #hl4_output = F.relu(self.hl4(hl3_output))
+        y = self.hl5(hl2_output)
         return y
 
 # Decide to use a specific expert on a task
@@ -116,7 +116,6 @@ class Gating(nn.Module):
         #loss = (2**(k))*((-1)**(1-b))*(1-distribution.log_prob(b))*distribution.log_prob(b_uniform))
 
     def save_stats(self, output_dir):
-        return
         if self.save_index % 10 != 0:
             self.save_index += 1
             return
