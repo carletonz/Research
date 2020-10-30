@@ -12,9 +12,9 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 4 # Number of experts
+M = 2 # Number of experts
 N = 2 # Number of tasks
-CONNECTION_SIZE = 256 # output size of expert and input size of task head
+CONNECTION_SIZE = 128 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
 
 # expert where inputs are color images
@@ -51,18 +51,18 @@ class Expert_conv(nn.Module):
 class Expert_linear(nn.Module):
     def __init__(self, input_size):
         super(Expert_linear, self).__init__()
-        self.hl1 = nn.Linear(input_size, 256)
-        self.hl2 = nn.Linear(256, 256)
+        self.hl1 = nn.Linear(input_size, 128)
+        #self.hl2 = nn.Linear(256, 256)
         #self.hl3 = nn.Linear(256, 256)
         #self.hl4 = nn.Linear(256, 256)
-        self.hl5 = nn.Linear(256, CONNECTION_SIZE)
+        self.hl5 = nn.Linear(128, CONNECTION_SIZE)
     
     def forward(self, x):
         hl1_output = F.relu(self.hl1(x))
-        hl2_output = F.relu(self.hl2(hl1_output))
+        #hl2_output = F.relu(self.hl2(hl1_output))
         #hl3_output = F.relu(self.hl3(hl2_output))
         #hl4_output = F.relu(self.hl4(hl3_output))
-        y = self.hl5(hl2_output)
+        y = self.hl5(hl1_output)
         return y
 
 # Decide to use a specific expert on a task
