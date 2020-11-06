@@ -62,8 +62,5 @@ for i in range(total_steps):
         obs, done = env.reset(), False
 
 
-print(obs_hist)
-print(act_hist)
-print(outputDir)
 np.save(outputDir+"/obshc", np.stack(obs_hist))
 np.save(outputDir+"/acthc", np.stack(act_hist))
