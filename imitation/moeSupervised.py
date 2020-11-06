@@ -30,25 +30,25 @@ halfCheetahEnv = gym.make("HalfCheetah-v2")
 loss_hist = []
 ant_return_hist = []
 hc_return_hist = []
-
-for j in range(100):
+batch_size = 10
+for j in range(50):
     ave_loss = 0
-    for i in range(int(antAct.shape[0]/50)):
+    for i in range(int(antAct.shape[0]/batch_size)):
         optimizer.zero_grad()
-        x = torch.cat((antObs[i*50:(i+1)*50], hcObs[i*50:(i+1)*50]), dim=1)
+        x = torch.cat((antObs[i*batch_size:(i+1)*batch_size], hcObs[i*batch_size:(i+1)*batch_size]), dim=1)
         output, batched = model(x)
         output = torch.cat(output, dim=1)
 
-        target = torch.cat((antAct[i*50:(i+1)*50], hcAct[i*50:(i+1)*50]), dim=1)
+        target = torch.cat((antAct[i*batch_size:(i+1)*batch_size], hcAct[i*batch_size:(i+1)*batch_size]), dim=1)
         loss = loss_fn(output, target)
         loss = model.get_loss(loss)
         ave_loss += loss.detach()
         loss.backward()
         optimizer.step()
     print("Epoch:", j)
-    print("Average Loss:", ave_loss/int(antAct.shape[0]/50))
+    print("Average Loss:", ave_loss/int(antAct.shape[0]/batch_size))
     print()
-    loss_hist.append(int(ave_loss/int(antAct.shape[0]/50)))
+    loss_hist.append(ave_loss/int(antAct.shape[0]/batch_size))
 
 
     antObsTest = antEnv.reset()
