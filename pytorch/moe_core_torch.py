@@ -4,7 +4,7 @@
 
 import torch
 #import torchvision
-#import torchvision.transforms as transforms
+import torchvision.transforms as T
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -12,17 +12,46 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 2 # Number of experts
+M = 1 # Number of experts
 N = 1 # Number of tasks
 CONNECTION_SIZE = 128 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
+
+
+# From: https://github.com/jmichaux/dqn-pytorch
+class Expert_CNN(nn.Module):
+    def __init__(self, in_channels=4, n_actions=4):
+        """
+        Initialize Deep Q Network
+
+        Args:
+            in_channels (int): number of input channels
+            n_actions (int): number of outputs
+        """
+        super(Expert_CNN, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=8, stride=4)
+        # self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        # self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        # self.bn3 = nn.BatchNorm2d(64)
+        self.fc4 = nn.Linear(7 * 7 * 64, 512)
+        self.head = nn.Linear(512, CONNECTION_SIZE)
+
+    def forward(self, x):
+        x = x.float() / 255
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = F.relu(self.fc4(x.view(x.size(0), -1)))
+        return self.head(x)
 
 # expert where inputs are color images
 # (f)
 class Expert_conv(nn.Module):
     def __init__(self):
         super(Expert_conv, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=5) # padding 0
+        self.conv1 = nn.Conv2d(in_channels=4, out_channels=6, kernel_size=5) # padding 0
         self.conv2 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5) # padding 0
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         
@@ -79,7 +108,7 @@ class Gating(nn.Module):
         self.save_index = 0
 
         #self.mapping = torch.eye(N)
-        #self.mapping = torch.tensor([[1.0],[0.0]])
+        #self.mapping = torch.tensor([[1.0],])
     
     def forward(self, x, extra_loss):
         """
@@ -87,20 +116,24 @@ class Gating(nn.Module):
         :param extra_loss
         :return B x N x F : 
         """
-        bernoulli = torch.distributions.bernoulli.Bernoulli(logits=self.logits)#probs=self.mapping)
+        bernoulli = torch.distributions.bernoulli.Bernoulli(logits = self.logits)#probs=self.mapping)
 
         b = bernoulli.sample(torch.Size([x.shape[0]]))
         w = b#self.weights * b
+        
         # depeds on b
         self.prob = bernoulli.probs
+        
         # should be a funcition for log probs
         logits_loss = self.get_logits_loss(bernoulli, b)
+        
         #outer product, sum
         output = torch.einsum('bmn, bmf->bnf', w, x)# need to be all the same type
 
         return output, extra_loss + logits_loss
 
     def get_logits_loss(self, distribution, b):
+        
         if GE_FUNCTION == "sf":
             return self._logits_loss_sf(distribution, b)
         elif GE_FUNCTION == "mv":
@@ -135,25 +168,25 @@ class Gating(nn.Module):
 class Task(nn.Module):
     def __init__(self, task_output_size):
         super(Task, self).__init__()
-        self.hl1 = nn.Linear(CONNECTION_SIZE, 128)
-        self.hl2 = nn.Linear(128, 64)
-        self.hl3 = nn.Linear(64, task_output_size)
+        self.hl1 = nn.Linear(CONNECTION_SIZE, task_output_size)
+        #self.hl2 = nn.Linear(128, 64)
+        #self.hl3 = nn.Linear(64, task_output_size)
     
     def forward(self, x):
-        hl1_output = F.relu(self.hl1(x))
-        hl2_output = F.relu(self.hl2(hl1_output))
-        y = self.hl3(hl2_output)
+        #hl1_output = F.relu(self.hl1(x))
+        #hl2_output = F.relu(self.hl2(hl1_output))
+        y = self.hl1(x)
         return y
 
 # (m)
 class MixtureOfExperts(nn.Module):
-    def __init__(self, input_size, task_output_size, input_type="V"):
+    def __init__(self, input_size, task_output_size, input_type="I"):
         super(MixtureOfExperts, self).__init__()
         self.experts = None
         self.expert_type = None
         if input_type == "I": # image
             self.experts = nn.ModuleList([
-                Expert_conv() for i in range(M)
+                Expert_CNN() for i in range(M)
             ])
             self.expert_type = 0
         elif input_type == "V": # vector
@@ -178,7 +211,7 @@ class MixtureOfExperts(nn.Module):
         """
         batched = True
         # makes sure experts are batched and have correct number of input dimentions
-        if self.expert_type == 0 and len(x.shape) > 3: # Images
+        if self.expert_type == 0 and len(x.shape) > 4: # Images
             raise ValueError("Expecting batched images, got {}".format(x.shape))
         if self.expert_type == 1:
             if len(x.shape) == 1:
