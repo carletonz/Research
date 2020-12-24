@@ -41,7 +41,7 @@ pong = make_env(pong)
 loss_hist = []
 #ant_return_hist = []
 pong_return_hist = []
-batch_size = 100
+batch_size = 50
 for j in range(500):
     ave_loss = 0
     for i in range(int(pongAct.shape[0]/batch_size)):
@@ -85,7 +85,7 @@ for j in range(500):
     #ant_return_hist.append(antReturn)
     pong_return_hist.append(pongReturn)
 
-result_id = "6-with-gating-small-task-network"
+result_id = "9-with-gating-small-task-network-smallerbatch"
 
 np.save(imitationDir+"/pong_loss"+result_id, np.array(loss_hist))
 #np.save(imitationDir+"/ant_return"+str(result_id), np.array(ant_return_hist))
