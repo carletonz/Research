@@ -56,7 +56,7 @@ def train():
 
             target = pongAct[i*batch_size:(i+1)*batch_size]#torch.cat((antAct[i*batch_size:(i+1)*batch_size], hcAct[i*batch_size:(i+1)*batch_size]), dim=1)
             loss = loss_fn(output, target)
-            loss = model.get_loss(loss)
+            #loss = model.get_loss(loss)
             ave_loss += loss.detach()
             loss.backward()
             optimizer.step()
@@ -76,7 +76,7 @@ def train():
         while count_games < 5:
             obs = get_state(pongObsTest).to(device)#torch.cat((torch.from_numpy(antObsTest), torch.from_numpy(hcObsTest))).to(torch.float)
             output, batch = model(obs)
-
+            
             #antObsTest, antReward, antDone, _ = antEnv.step(output[0].detach().cpu().numpy())
             pongObsTest, pongReward, pongDone, _ = pong.step(np.argmax(output[0].detach().cpu().numpy()))
 
@@ -107,7 +107,7 @@ loss_result /= 5.0
 return_result /= 5.0
 
 
-result_id = "12-averaged-with-gating-small-task-network-50batch-1000epoch-5experts"
+result_id = "14-averaged-no-gating-small-task-network-50batch-1000epoch-expert-size-expanded"
 
 np.save(imitationDir+"/pong_loss"+result_id, loss_result)
 #np.save(imitationDir+"/ant_return"+str(result_id), np.array(ant_return_hist))

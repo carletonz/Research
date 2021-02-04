@@ -12,7 +12,7 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 5 # Number of experts
+M = 1 # Number of experts
 N = 1 # Number of tasks
 CONNECTION_SIZE = 128 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
@@ -29,13 +29,12 @@ class Expert_CNN(nn.Module):
             n_actions (int): number of outputs
         """
         super(Expert_CNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=8, stride=4)
-        # self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
-        # self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
-        # self.bn3 = nn.BatchNorm2d(64)
-        self.fc4 = nn.Linear(7 * 7 * 64, 512)
+        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=16, stride=4)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=8, stride=2)
+        self.conv3 = nn.Conv2d(128, 128, kernel_size=4, stride=1)
+
+        self.fc5 = nn.Linear(3 * 3 * 128, 1024)
+        self.fc6 = nn.Linear(1024, 512)
         self.head = nn.Linear(512, CONNECTION_SIZE)
 
     def forward(self, x):
@@ -43,7 +42,9 @@ class Expert_CNN(nn.Module):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
-        x = F.relu(self.fc4(x.view(x.size(0), -1)))
+        x = F.relu(self.fc5(x.view(x.size(0), -1)))
+        x = F.relu(self.fc6(x))
+
         return self.head(x)
 
 # expert where inputs are color images
@@ -51,8 +52,8 @@ class Expert_CNN(nn.Module):
 class Expert_conv(nn.Module):
     def __init__(self):
         super(Expert_conv, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=4, out_channels=6, kernel_size=5) # padding 0
-        self.conv2 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5) # padding 0
+        self.conv1 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=5) # padding 0
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=5) # padding 0
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         
         self.fc1 = nn.Linear(16*22*22, 120)
@@ -108,7 +109,7 @@ class Gating(nn.Module):
         self.save_index = 0
 
         #self.mapping = torch.eye(N)
-        #self.mapping = torch.tensor([[1.0],])
+        self.mapping = torch.tensor([[1.0],]).to(device)
     
     def forward(self, x, extra_loss):
         """
@@ -116,21 +117,21 @@ class Gating(nn.Module):
         :param extra_loss
         :return B x N x F : 
         """
-        bernoulli = torch.distributions.bernoulli.Bernoulli(logits = self.logits)#probs=self.mapping)
+        bernoulli = torch.distributions.bernoulli.Bernoulli(probs=self.mapping)#logits = self.logits)#probs=self.mapping)
 
         b = bernoulli.sample(torch.Size([x.shape[0]]))
         w = b#self.weights * b
-        
+
         # depeds on b
         self.prob = bernoulli.probs
         
         # should be a funcition for log probs
-        logits_loss = self.get_logits_loss(bernoulli, b)
+        #logits_loss = self.get_logits_loss(bernoulli, b)
         
         #outer product, sum
         output = torch.einsum('bmn, bmf->bnf', w, x)# need to be all the same type
 
-        return output, extra_loss + logits_loss
+        return output, extra_loss #+ logits_loss
 
     def get_logits_loss(self, distribution, b):
         
