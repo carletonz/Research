@@ -12,7 +12,7 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 1 # Number of experts
+M = 5 # Number of experts
 N = 1 # Number of tasks
 CONNECTION_SIZE = 128 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
@@ -29,12 +29,11 @@ class Expert_CNN(nn.Module):
             n_actions (int): number of outputs
         """
         super(Expert_CNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=16, stride=4)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=8, stride=2)
-        self.conv3 = nn.Conv2d(128, 128, kernel_size=4, stride=1)
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=8, stride=4)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
 
-        self.fc5 = nn.Linear(3 * 3 * 128, 1024)
-        self.fc6 = nn.Linear(1024, 512)
+        self.fc4 = nn.Linear(7 * 7 * 64, 512)
         self.head = nn.Linear(512, CONNECTION_SIZE)
 
     def forward(self, x):
@@ -42,8 +41,7 @@ class Expert_CNN(nn.Module):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
-        x = F.relu(self.fc5(x.view(x.size(0), -1)))
-        x = F.relu(self.fc6(x))
+        x = F.relu(self.fc4(x.view(x.size(0), -1)))
 
         return self.head(x)
 
@@ -109,7 +107,7 @@ class Gating(nn.Module):
         self.save_index = 0
 
         #self.mapping = torch.eye(N)
-        self.mapping = torch.tensor([[1.0],]).to(device)
+        self.mapping = torch.tensor([[1.0],[1.0],[1.0],[1.0],[1.0]]).to(device)
     
     def forward(self, x, extra_loss):
         """
