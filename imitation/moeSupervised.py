@@ -107,7 +107,7 @@ loss_result /= 5.0
 return_result /= 5.0
 
 
-result_id = "15-averaged-no-gating-small-task-network-50batch-1000epoch-5expert"
+result_id = "16-averaged-no-gating-small-task-network-50batch-1000epoch-1expert"
 
 np.save(imitationDir+"/pong_loss"+result_id, loss_result)
 #np.save(imitationDir+"/ant_return"+str(result_id), np.array(ant_return_hist))

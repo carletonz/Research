@@ -12,7 +12,7 @@ import numpy as np
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-M = 5 # Number of experts
+M = 1 # Number of experts
 N = 1 # Number of tasks
 CONNECTION_SIZE = 128 # output size of expert and input size of task head
 GE_FUNCTION = "sf" # gradient estimator to use: "sf" = score function, "mv" = measure-valued
@@ -107,7 +107,7 @@ class Gating(nn.Module):
         self.save_index = 0
 
         #self.mapping = torch.eye(N)
-        self.mapping = torch.tensor([[1.0],[1.0],[1.0],[1.0],[1.0]]).to(device)
+        self.mapping = torch.tensor([[1.0],]).to(device)
     
     def forward(self, x, extra_loss):
         """
