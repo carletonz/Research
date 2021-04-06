@@ -15,10 +15,10 @@ def get_state(obs):
 
 hcDir = "/home/ubuntu/Documents/proj/research/Research/imitation/imit-1603432232"
 antDir = "/home/ubuntu/Documents/proj/research/Research/imitation/imit-1603343612"
-imitationDir ="/home/ubuntu/Documents/proj/research/Research/imitation" 
+imitationDir ="/home/ubuntu/Documents/proj/research/Research/imitation/final_results" 
 
-pongAct = torch.squeeze(torch.load("imitation/act_collection_pong_2.pt")).to(device)
-pongObs = torch.squeeze(torch.load("imitation/obs_collection_pong_2.pt").to(torch.float))
+pongAct = torch.squeeze(torch.load("imitation/pong_data/act_collection_pong_2.pt")).to(device)
+pongObs = torch.squeeze(torch.load("imitation/pong_data/obs_collection_pong_2.pt").to(torch.float))
 
 #hcAct = torch.from_numpy(np.load(hcDir+"/acthc.npy")).to(torch.float)
 #hcObs = torch.from_numpy(np.load(hcDir+"/obshc.npy")).to(torch.float)
@@ -45,7 +45,7 @@ def train():
     loss_hist = []
     #ant_return_hist = []
     pong_return_hist = []
-    batch_size = 50
+    batch_size = 25
     for j in range(1000):
         ave_loss = 0
         for i in range(int(pongAct.shape[0]/batch_size)):
@@ -56,7 +56,7 @@ def train():
 
             target = pongAct[i*batch_size:(i+1)*batch_size]#torch.cat((antAct[i*batch_size:(i+1)*batch_size], hcAct[i*batch_size:(i+1)*batch_size]), dim=1)
             loss = loss_fn(output, target)
-            #loss = model.get_loss(loss)
+            loss = model.get_loss(loss)
             ave_loss += loss.detach()
             loss.backward()
             optimizer.step()
@@ -73,7 +73,7 @@ def train():
         pongReturn = 0
         count_games = 0
 
-        while count_games < 5:
+        while count_games < 3:
             obs = get_state(pongObsTest).to(device)#torch.cat((torch.from_numpy(antObsTest), torch.from_numpy(hcObsTest))).to(torch.float)
             output, batch = model(obs)
             
@@ -89,25 +89,26 @@ def train():
 
 
         #print("Ant Return:",antReturn)
-        print("Pong Return:", pongReturn/5.0)
+        print("Pong Return:", pongReturn/3.0)
         print()
 
         #ant_return_hist.append(antReturn)
-        pong_return_hist.append(pongReturn/5.0)
-    return np.array(loss_hist), np.array(pong_return_hist)
+        pong_return_hist.append(pongReturn/3.0)
+    return np.array(loss_hist), np.array(pong_return_hist), model.gates.prob.detach().cpu().numpy()
 
 
+result_id = "_1env_0.0"
 loss_result = 0
 return_result = 0
-for i in range(5):
-    l, r = train()
+repeat=3.0
+
+for i in range(int(repeat)):
+    l, r, p = train()
     loss_result += l
     return_result += r
-loss_result /= 5.0
-return_result /= 5.0
-
-
-result_id = "16-averaged-no-gating-small-task-network-50batch-1000epoch-1expert"
+    np.save(imitationDir+"/pong_prob"+str(i)+result_id, p)
+loss_result /= repeat
+return_result /= repeat
 
 np.save(imitationDir+"/pong_loss"+result_id, loss_result)
 #np.save(imitationDir+"/ant_return"+str(result_id), np.array(ant_return_hist))

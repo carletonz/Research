@@ -100,14 +100,14 @@ class Gating(nn.Module):
     def __init__(self):
         super(Gating, self).__init__()
         #self.weights = nn.Parameter(torch.zeros([M, N]))
-        
+        self.prob_history = []
         self.logits = nn.Parameter(torch.zeros([M, N]))
 
         self.prob = torch.zeros([M,N])
         self.save_index = 0
 
         #self.mapping = torch.eye(N)
-        self.mapping = torch.tensor([[1.0],]).to(device)
+        #self.mapping = torch.tensor([[1.0],]).to(device)
     
     def forward(self, x, extra_loss):
         """
@@ -115,21 +115,22 @@ class Gating(nn.Module):
         :param extra_loss
         :return B x N x F : 
         """
-        bernoulli = torch.distributions.bernoulli.Bernoulli(probs=self.mapping)#logits = self.logits)#probs=self.mapping)
+        bernoulli = torch.distributions.bernoulli.Bernoulli(logits = self.logits)#probs=self.mapping)
 
         b = bernoulli.sample(torch.Size([x.shape[0]]))
         w = b#self.weights * b
 
         # depeds on b
         self.prob = bernoulli.probs
-        
+        #self.save_stats()
+
         # should be a funcition for log probs
-        #logits_loss = self.get_logits_loss(bernoulli, b)
+        logits_loss = self.get_logits_loss(bernoulli, b)
         
         #outer product, sum
         output = torch.einsum('bmn, bmf->bnf', w, x)# need to be all the same type
 
-        return output, extra_loss #+ logits_loss
+        return output, extra_loss + logits_loss
 
     def get_logits_loss(self, distribution, b):
         
@@ -147,18 +148,19 @@ class Gating(nn.Module):
         #b_uniform = (uniform.sample(b.shape) > .5).to(torch.float)
         #loss = (2**(k))*((-1)**(1-b))*(1-distribution.log_prob(b))*distribution.log_prob(b_uniform))
 
-    def save_stats(self, output_dir):
+    def save_stats(self):
         if self.save_index % 10 != 0:
             self.save_index += 1
             return
         
         #if not os.path.isdir(output_dir+"/weights"):
         #    os.makedirs(output_dir+"/weights")
-        if not os.path.isdir(output_dir+"/probs"):
-            os.makedirs(output_dir+"/probs")
         #np.save(output_dir+"/weights/weights"+str(self.save_index), self.weights.detach().cpu().numpy())
-        np.save(output_dir+"/probs/probs"+str(self.save_index), self.prob.detach().cpu().numpy())
+        self.prob_hist.append(self.prob.detach().cpu().numpy())
         self.save_index += 1
+    def save_prob_history(self, output_dir):
+        temp = np.stack(self.prob_hist, axis=0)
+        np.save(output_dir+"probs", temp)
 
 
 # Task Head for each task
