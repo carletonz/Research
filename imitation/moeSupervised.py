@@ -26,7 +26,7 @@ pongObs = torch.squeeze(torch.load("imitation/pong_data/obs_collection_pong_2.pt
 #hcAct = hcAct[shuffle]
 #hcObs = hcObs[shuffle]
 
-def train():
+def train(run_num = 0):
     global pongAct, pongObs
     shuffle = torch.randperm(pongAct.shape[0])
     pongAct = pongAct[shuffle]
@@ -51,7 +51,7 @@ def train():
         for i in range(int(pongAct.shape[0]/batch_size)):
             optimizer.zero_grad()
             x = pongObs[i*batch_size:(i+1)*batch_size].to(torch.float).to(device)#torch.cat((antObs[i*batch_size:(i+1)*batch_size], hcObs[i*batch_size:(i+1)*batch_size]), dim=1)
-            output, batched = model(x)
+            output, batched, _ = model(x)
             output = torch.cat(output, dim=1)
 
             target = pongAct[i*batch_size:(i+1)*batch_size]#torch.cat((antAct[i*batch_size:(i+1)*batch_size], hcAct[i*batch_size:(i+1)*batch_size]), dim=1)
@@ -72,18 +72,23 @@ def train():
         antReturn = 0
         pongReturn = 0
         count_games = 0
+        exp_history = []
 
         while count_games < 3:
             obs = get_state(pongObsTest).to(device)#torch.cat((torch.from_numpy(antObsTest), torch.from_numpy(hcObsTest))).to(torch.float)
-            output, batch = model(obs)
+            output, batch, expert_output = model(obs)
             
+            exp_history.append(expert_output)
+
             #antObsTest, antReward, antDone, _ = antEnv.step(output[0].detach().cpu().numpy())
             pongObsTest, pongReward, pongDone, _ = pong.step(np.argmax(output[0].detach().cpu().numpy()))
 
             #antReturn += antReward
             pongReturn += pongReward
-
+            debug_flag = False
             if pongDone:
+                if j == 999:
+                    np.save(imitationDir+"/pong_expert_ep999_" + str(count_games) + "_" + str(run_num), np.stack(exp_history, axis = 0))
                 count_games += 1
                 pongObsTest = pong.reset()
 
@@ -97,13 +102,13 @@ def train():
     return np.array(loss_hist), np.array(pong_return_hist), model.gates.prob.detach().cpu().numpy()
 
 
-result_id = "_1env_0.0"
+result_id = "_1env_0.1"
 loss_result = 0
 return_result = 0
 repeat=3.0
 
 for i in range(int(repeat)):
-    l, r, p = train()
+    l, r, p = train(i)
     loss_result += l
     return_result += r
     np.save(imitationDir+"/pong_prob"+str(i)+result_id, p)
