@@ -17,8 +17,13 @@ hcDir = "/home/ubuntu/Documents/proj/research/Research/imitation/imit-1603432232
 antDir = "/home/ubuntu/Documents/proj/research/Research/imitation/imit-1603343612"
 imitationDir ="/home/ubuntu/Documents/proj/research/Research/imitation/final_results" 
 
-pongAct = torch.squeeze(torch.load("imitation/pong_data/act_collection_pong_2.pt")).to(device)
+#pongAct = torch.squeeze(torch.load("imitation/pong_data/act_collection_pong_2.pt")).to(device)
 pongObs = torch.squeeze(torch.load("imitation/pong_data/obs_collection_pong_2.pt").to(torch.float))
+
+pongAct1 = torch.squeeze(torch.load("imitation/pong_data/act_split_pong_2.pt")).to(device)
+pongAct2 = pongAct1[:, 1]
+pongAct1 = pongAct1[:, 0]
+
 
 #hcAct = torch.from_numpy(np.load(hcDir+"/acthc.npy")).to(torch.float)
 #hcObs = torch.from_numpy(np.load(hcDir+"/obshc.npy")).to(torch.float)
@@ -27,14 +32,28 @@ pongObs = torch.squeeze(torch.load("imitation/pong_data/obs_collection_pong_2.pt
 #hcObs = hcObs[shuffle]
 
 def train(run_num = 0):
-    global pongAct, pongObs
-    shuffle = torch.randperm(pongAct.shape[0])
-    pongAct = pongAct[shuffle]
+    global pongAct1, pongObs, pongAct2
+    shuffle = torch.randperm(pongAct1.shape[0])
+    pongAct1 = pongAct1[shuffle]
+    pongAct2 = pongAct2[shuffle]
     pongObs = pongObs[shuffle]
 
-    model = moeCore.MixtureOfExperts(0, [4]).to(device)
-    loss_fn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    ##model = moeCore.MixtureOfExperts(0, [4]).to(device)
+    ##loss_fn = torch.nn.CrossEntropyLoss()
+    ##optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+
+
+    ## pong action space: 6 actions (0,1 = do nothing; 2,4 = up; 3,5 = down)
+    ## we only use 4
+    model1 = moeCore.MixtureOfExperts(0, [2]).to(device)
+    loss_fn1 = torch.nn.CrossEntropyLoss()
+    optimizer1 = torch.optim.SGD(model1.parameters(), lr=0.01)
+
+    model2 = moeCore.MixtureOfExperts(0, [2]).to(device)
+    loss_fn2 = torch.nn.CrossEntropyLoss()
+    optimizer2 = torch.optim.SGD(model2.parameters(), lr=0.01)
+
+
 
     #antEnv = gym.make("Ant-v2")
     #halfCheetahEnv = gym.make("HalfCheetah-v2")
@@ -47,23 +66,37 @@ def train(run_num = 0):
     pong_return_hist = []
     batch_size = 25
     for j in range(1000):
-        ave_loss = 0
-        for i in range(int(pongAct.shape[0]/batch_size)):
-            optimizer.zero_grad()
-            x = pongObs[i*batch_size:(i+1)*batch_size].to(torch.float).to(device)#torch.cat((antObs[i*batch_size:(i+1)*batch_size], hcObs[i*batch_size:(i+1)*batch_size]), dim=1)
-            output, batched, _ = model(x)
-            output = torch.cat(output, dim=1)
+        ave_loss1 = 0
+        ave_loss2 = 0
+        for i in range(int(pongAct1.shape[0]/batch_size)):
+            optimizer1.zero_grad()
+            optimizer2.zero_grad()
 
-            target = pongAct[i*batch_size:(i+1)*batch_size]#torch.cat((antAct[i*batch_size:(i+1)*batch_size], hcAct[i*batch_size:(i+1)*batch_size]), dim=1)
-            loss = loss_fn(output, target)
-            loss = model.get_loss(loss)
-            ave_loss += loss.detach()
-            loss.backward()
-            optimizer.step()
+            x = pongObs[i*batch_size:(i+1)*batch_size].to(torch.float).to(device)#torch.cat((antObs[i*batch_size:(i+1)*batch_size], hcObs[i*batch_size:(i+1)*batch_size]), dim=1)
+            output1,_,_ = model1(x)
+            output2,_,_ = model2(x)
+            output1 = torch.cat(output1, dim=1)
+            output2 = torch.cat(output2, dim=1)
+
+            target1 = pongAct1[i*batch_size:(i+1)*batch_size]#torch.cat((antAct[i*batch_size:(i+1)*batch_size], hcAct[i*batch_size:(i+1)*batch_size]), dim=1)
+            loss1 = loss_fn1(output1, target1)
+            loss1 = model1.get_loss(loss1)
+            ave_loss1 += loss1.detach()
+            loss1.backward()
+            optimizer1.step()
+
+
+            target2 = pongAct2[i*batch_size:(i+1)*batch_size]#torch.cat((antAct[i*batch_size:(i+1)*batch_size], hcAct[i*batch_size:(i+1)*batch_size]), dim=1)
+            loss2 = loss_fn2(output2, target2)
+            loss2 = model2.get_loss(loss2)
+            ave_loss2 += loss2.detach()
+            loss2.backward()
+            optimizer2.step()
+
         print("Epoch:", j)
-        print("Average Loss:", ave_loss/int(pongAct.shape[0]/batch_size))
+        print("Average Loss:", ave_loss1/int(pongAct1.shape[0]/batch_size), ave_loss2/int(pongAct2.shape[0]/batch_size))
         print()
-        loss_hist.append(ave_loss/int(pongAct.shape[0]/batch_size))
+        ## loss_hist.append(ave_loss/int(pongAct.shape[0]/batch_size))
 
 
         #antObsTest = antEnv.reset()
@@ -76,19 +109,20 @@ def train(run_num = 0):
 
         while count_games < 3:
             obs = get_state(pongObsTest).to(device)#torch.cat((torch.from_numpy(antObsTest), torch.from_numpy(hcObsTest))).to(torch.float)
-            output, batch, expert_output = model(obs)
-            
-            exp_history.append(expert_output)
+            output1, _, _ = model1(obs)
+            output2, _, _ = model2(obs)
+            ##exp_history.append(expert_output)
 
             #antObsTest, antReward, antDone, _ = antEnv.step(output[0].detach().cpu().numpy())
-            pongObsTest, pongReward, pongDone, _ = pong.step(np.argmax(output[0].detach().cpu().numpy()))
+            a = np.argmax(output1[0].detach().cpu().numpy()) * 2 + np.argmax(output2[0].detach().cpu().numpy())
+            pongObsTest, pongReward, pongDone, _ = pong.step(a)
 
             #antReturn += antReward
             pongReturn += pongReward
             debug_flag = False
             if pongDone:
-                if j == 999:
-                    np.save(imitationDir+"/pong_expert_ep999_" + str(count_games) + "_" + str(run_num), np.stack(exp_history, axis = 0))
+                ##if j == 999:
+                ##  np.save(imitationDir+"/pong_expert_ep999_" + str(count_games) + "_" + str(run_num), np.stack(exp_history, axis = 0))
                 count_games += 1
                 pongObsTest = pong.reset()
 
@@ -99,23 +133,23 @@ def train(run_num = 0):
 
         #ant_return_hist.append(antReturn)
         pong_return_hist.append(pongReturn/3.0)
-    return np.array(loss_hist), np.array(pong_return_hist), model.gates.prob.detach().cpu().numpy()
+    return np.array(loss_hist), np.array(pong_return_hist), 0##model.gates.prob.detach().cpu().numpy()
 
 
-result_id = "_1env_0.1"
+result_id = "_1env_1.0"
 loss_result = 0
 return_result = 0
 repeat=3.0
 
 for i in range(int(repeat)):
     l, r, p = train(i)
-    loss_result += l
+    ##loss_result += l
     return_result += r
-    np.save(imitationDir+"/pong_prob"+str(i)+result_id, p)
-loss_result /= repeat
+    ##np.save(imitationDir+"/pong_prob"+str(i)+result_id, p)
+##loss_result /= repeat
 return_result /= repeat
 
-np.save(imitationDir+"/pong_loss"+result_id, loss_result)
+##np.save(imitationDir+"/pong_loss"+result_id, loss_result)
 #np.save(imitationDir+"/ant_return"+str(result_id), np.array(ant_return_hist))
 np.save(imitationDir+"/pong_return"+result_id, return_result)
 
