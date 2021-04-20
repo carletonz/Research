@@ -20,7 +20,7 @@ imitationDir ="/home/ubuntu/Documents/proj/research/Research/imitation/final_res
 #pongAct = torch.squeeze(torch.load("imitation/pong_data/act_collection_pong_2.pt")).to(device)
 pongObs = torch.squeeze(torch.load("imitation/pong_data/obs_collection_pong_2.pt").to(torch.float))
 
-pongAct1 = torch.squeeze(torch.load("imitation/pong_data/act_split_pong_2.pt")).to(device)
+pongAct1 = torch.squeeze(torch.load("imitation/pong_data/act_split2103_pong_2.pt")).to(device)
 pongAct2 = pongAct1[:, 1]
 pongAct1 = pongAct1[:, 0]
 
@@ -105,24 +105,34 @@ def train(run_num = 0):
         antReturn = 0
         pongReturn = 0
         count_games = 0
-        exp_history = []
+        exp_history1 = []
+        exp_history2 = []
 
         while count_games < 3:
             obs = get_state(pongObsTest).to(device)#torch.cat((torch.from_numpy(antObsTest), torch.from_numpy(hcObsTest))).to(torch.float)
-            output1, _, _ = model1(obs)
-            output2, _, _ = model2(obs)
-            ##exp_history.append(expert_output)
+            output1, _, expert_output1 = model1(obs)
+            output2, _, expert_output2 = model2(obs)
+            exp_history1.append(expert_output1)
+            exp_history2.append(expert_output2)
 
             #antObsTest, antReward, antDone, _ = antEnv.step(output[0].detach().cpu().numpy())
             a = np.argmax(output1[0].detach().cpu().numpy()) * 2 + np.argmax(output2[0].detach().cpu().numpy())
+            
+            # when 0123 --maped to--> 2103
+
+            if a == 2:
+                a = 0
+            if a == 0:
+                a = 2
             pongObsTest, pongReward, pongDone, _ = pong.step(a)
 
             #antReturn += antReward
             pongReturn += pongReward
             debug_flag = False
             if pongDone:
-                ##if j == 999:
-                ##  np.save(imitationDir+"/pong_expert_ep999_" + str(count_games) + "_" + str(run_num), np.stack(exp_history, axis = 0))
+                if j == 999:
+                    np.save(imitationDir+"/pong_expert_ep999_model1_" + str(count_games) + "_" + str(run_num), np.stack(exp_history1, axis = 0))
+                    np.save(imitationDir+"/pong_expert_ep999_model2_" + str(count_games) + "_" + str(run_num), np.stack(exp_history2, axis = 0))
                 count_games += 1
                 pongObsTest = pong.reset()
 
@@ -133,19 +143,20 @@ def train(run_num = 0):
 
         #ant_return_hist.append(antReturn)
         pong_return_hist.append(pongReturn/3.0)
-    return np.array(loss_hist), np.array(pong_return_hist), 0##model.gates.prob.detach().cpu().numpy()
+    return np.array(loss_hist), np.array(pong_return_hist), model1.gates.prob.detach().cpu().numpy(), model2.gates.prob.detach().cpu().numpy()
 
 
-result_id = "_1env_1.0"
+result_id = "_1env_1.1"
 loss_result = 0
 return_result = 0
 repeat=3.0
 
 for i in range(int(repeat)):
-    l, r, p = train(i)
+    l, r, p1, p2 = train(i)
     ##loss_result += l
     return_result += r
-    ##np.save(imitationDir+"/pong_prob"+str(i)+result_id, p)
+    np.save(imitationDir+"/pong_prob1_"+str(i)+result_id, p1)
+    np.save(imitationDir+"/pong_prob2_"+str(i)+result_id, p2)
 ##loss_result /= repeat
 return_result /= repeat
 
